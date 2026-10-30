@@ -40,6 +40,7 @@ export const remoteAdapter = {
     create: todo('bookings.create'),
     cancel: todo('bookings.cancel'),
     reschedule: todo('bookings.reschedule'),
+    rate: todo('bookings.rate'),
     scheduleDelivery: todo('bookings.scheduleDelivery'),
   },
   tracking: { get: todo('tracking.get') },

@@ -18,7 +18,7 @@ Add `{portalRoutes()}` (from `src/portal/routes.jsx`) inside your existing `<Rou
 | profile | get, update |
 | vehicles | list, create, update, remove |
 | centers | list |
-| bookings | serviceTypes, list({tab,query,vehicleId,cursor,limit}), summary, get, create(payload, idempotencyKey), cancel, reschedule(id, {date, slot}), scheduleDelivery |
+| bookings | serviceTypes, list({tab,query,vehicleId,cursor,limit}), summary, get, create(payload, idempotencyKey), cancel, reschedule(id, {date, slot}), rate(id, {service, driver, comment}), scheduleDelivery |
 | tracking | get (returns booking, lastUpdated, liveLocation = null when there is no GPS) |
 | handover | resend(bookingId, 'pickup' | 'delivery'). The pending code is returned on the booking as `handovers.<type>.code`; the driver submits it. |
 | serviceProgress | get (null until the center has the vehicle) |
@@ -33,6 +33,7 @@ Return shapes: see the objects built in `demoAdapter.js`. Map your statuses to t
 - `create` is idempotent per key; reject unknown vehicle/center and past dates.
 - OTP codes are generated, delivered, expired and attempt-limited on the server. The browser only submits a code.
 - A vehicle with an open booking cannot be removed.
+- `rate` only once, only after delivery; ratings are 1 to 5.
 
 ## What is real vs simulated in demo mode
 Real in the UI and logic: routing and guards, form validation, wizard, duplicate-submit protection, status-dependent actions,

@@ -367,6 +367,18 @@ export const demoAdapter = {
       c.save();
       return view(c.d, b);
     },
+    async rate(id, { service, driver, comment }) {
+      await delay(350);
+      const c = ctx();
+      const b = find(c.d, id);
+      if (b.status !== 'delivered') throw new E('NOT_ALLOWED', 'You can rate a booking once your vehicle is delivered.');
+      if (b.feedback) throw new E('ALREADY_RATED', 'You have already rated this booking.');
+      const ok = (n) => Number.isInteger(n) && n >= 1 && n <= 5;
+      if (!ok(service) || (driver != null && !ok(driver))) throw new E('INVALID_INPUT', 'Choose a rating from 1 to 5 stars.');
+      b.feedback = { service, driver: driver ?? null, comment: (comment || '').trim().slice(0, 500), at: nowISO() };
+      c.save();
+      return view(c.d, b);
+    },
     async scheduleDelivery(id, { date, slot, address }) {
       await delay(400);
       const c = ctx();

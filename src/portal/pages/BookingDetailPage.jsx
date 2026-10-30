@@ -8,6 +8,7 @@ import BookingActions from '../features/booking/BookingActions';
 import HandoverPanel from '../features/handover/HandoverPanel';
 import ServiceProgress from '../features/service/ServiceProgress';
 import ConditionReports from '../features/booking/ConditionReports';
+import FeedbackCard from '../features/booking/FeedbackCard';
 import { DetailRow, DriverBlock } from '../features/booking/parts';
 
 export default function BookingDetailPage() {
@@ -37,6 +38,7 @@ export default function BookingDetailPage() {
 
       <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
         <div className="space-y-6">
+          <FeedbackCard booking={b} onChanged={changed} />
           <HandoverPanel booking={b} onChanged={changed} />
           <ServiceProgress bookingId={b.id} status={b.status} />
           <ConditionReports booking={b} />
