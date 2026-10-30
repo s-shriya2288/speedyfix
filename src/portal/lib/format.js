@@ -27,3 +27,4 @@ export const initials = (name = '') =>
   name.trim().split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase() || '').join('') || 'SF';
 export const todayISO = () => new Date().toISOString().slice(0, 10);
 export const vehicleLabel = (v) => (v ? [v.make, v.model].filter(Boolean).join(' ') : '');
+export const fmtINR = (n) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n || 0);

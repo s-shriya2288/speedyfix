@@ -149,6 +149,16 @@ function consumeOtp(d, b, type, code) {
   setStatus(d, b, type === 'pickup' ? 'picked_up' : 'delivered');
 }
 
+const WO_DETAIL = { waiting_parts: 'Waiting for parts', quality_check: 'Quality check' };
+/** The customer's view of a work order's charges: labour at the center's hourly rate plus parts. Final once the work order is completed. */
+function billFor(wo) {
+  if (!wo || (!wo.labour?.length && !wo.parts?.length)) return null;
+  const labour = wo.labour.map((l) => ({ id: l.id, description: l.description || 'Labour', hours: l.hours, rate: l.rate, amount: Math.round(l.hours * l.rate) }));
+  const parts = wo.parts.map((p) => ({ id: p.id, description: p.description, qty: p.qty, unitPrice: p.unitPrice, amount: Math.round(p.qty * p.unitPrice) }));
+  const sum = (xs) => xs.reduce((t, x) => t + x.amount, 0);
+  return { labour, parts, labourTotal: sum(labour), partsTotal: sum(parts), total: sum(labour) + sum(parts), final: wo.status === 'completed' };
+}
+
 // ---------- adapter ----------
 export const demoAdapter = {
   mode: 'demo',
@@ -400,7 +410,9 @@ export const demoAdapter = {
         { key: 'complete', label: 'Service completed', state: done ? 'done' : 'todo' },
         { key: 'delivery', label: 'Delivery scheduling', state: b.delivery ? 'done' : done ? 'active' : 'todo', detail: b.delivery ? `${b.delivery.date}, ${b.delivery.slot}` : undefined },
       ];
-      return { source: 'demo', workOrderRef: `WO-DEMO-${b.reference.slice(-5)}`, items, percent: Math.round((items.filter((i) => i.state === 'done').length / items.length) * 100) };
+      const wo = b.workOrder;
+      if (wo && WO_DETAIL[wo.status] && !done) items[1].detail = WO_DETAIL[wo.status];
+      return { source: 'demo', workOrderRef: wo?.reference || `WO-DEMO-${b.reference.slice(-5)}`, items, percent: Math.round((items.filter((i) => i.state === 'done').length / items.length) * 100), bill: billFor(wo) };
     },
   },
 
