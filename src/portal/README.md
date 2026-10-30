@@ -18,7 +18,7 @@ Add `{portalRoutes()}` (from `src/portal/routes.jsx`) inside your existing `<Rou
 | profile | get, update |
 | vehicles | list, create, update, remove |
 | centers | list |
-| bookings | serviceTypes, list({tab,query,vehicleId,cursor,limit}), summary, get, create(payload, idempotencyKey), cancel, scheduleDelivery |
+| bookings | serviceTypes, list({tab,query,vehicleId,cursor,limit}), summary, get, create(payload, idempotencyKey), cancel, reschedule(id, {date, slot}), scheduleDelivery |
 | tracking | get (returns booking, lastUpdated, liveLocation = null when there is no GPS) |
 | handover | resend(bookingId, 'pickup' | 'delivery'). The pending code is returned on the booking as `handovers.<type>.code`; the driver submits it. |
 | serviceProgress | get (null until the center has the vehicle) |
@@ -29,7 +29,7 @@ Return shapes: see the objects built in `demoAdapter.js`. Map your statuses to t
 ## Server-side rules the backend must enforce (the UI only hints at them)
 - Every read and write is scoped to the authenticated customer. Never trust a customer id from the browser (with Supabase: RLS
   policies on vehicles, bookings and notifications keyed on `auth.uid()`).
-- `cancel` only before the pickup starts; `scheduleDelivery` only after service is completed and only once.
+- `cancel` and `reschedule` only before the pickup starts (confirmed or driver assigned); tell an assigned driver about a new time; `scheduleDelivery` only after service is completed and only once.
 - `create` is idempotent per key; reject unknown vehicle/center and past dates.
 - OTP codes are generated, delivered, expired and attempt-limited on the server. The browser only submits a code.
 - A vehicle with an open booking cannot be removed.

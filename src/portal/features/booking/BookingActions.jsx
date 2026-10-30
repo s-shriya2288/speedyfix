@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { services } from '../../services';
 import { Button, ConfirmDialog, useToast } from '../../ui';
-import { canCancelHint, canScheduleDeliveryHint, isTrackable, isOpen } from '../../domain/status';
+import { canCancelHint, canRescheduleHint, canScheduleDeliveryHint, isTrackable, isOpen } from '../../domain/status';
 import { notifyChanged } from '../../lib/events';
 import ScheduleDeliveryModal from './ScheduleDeliveryModal';
+import RescheduleModal from './RescheduleModal';
 
 /**
  * Action buttons depend on booking status. They are hints only: cancellation and delivery scheduling are
@@ -14,6 +15,7 @@ export default function BookingActions({ booking, onChanged, hideView = false, s
   const toast = useToast();
   const [cancelOpen, setCancelOpen] = useState(false);
   const [schedOpen, setSchedOpen] = useState(false);
+  const [moveOpen, setMoveOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -36,6 +38,7 @@ export default function BookingActions({ booking, onChanged, hideView = false, s
       {!hideView && <Button as={Link} to={`/customer/bookings/${booking.id}`} variant="secondary" size={size}>View details</Button>}
       {isTrackable(booking) && isOpen(booking) && <Button as={Link} to={`/customer/tracking/${booking.id}`} variant="secondary" size={size}>Track vehicle</Button>}
       {canScheduleDeliveryHint(booking) && <Button size={size} onClick={() => setSchedOpen(true)}>Schedule delivery</Button>}
+      {canRescheduleHint(booking) && <Button variant="secondary" size={size} onClick={() => setMoveOpen(true)}>Change pickup time</Button>}
       {canCancelHint(booking) && <Button variant="danger" size={size} onClick={() => { setError(''); setCancelOpen(true); }}>Cancel booking</Button>}
       {!isOpen(booking) && <Button as={Link} to={`/customer/bookings/new?from=${booking.id}`} variant="ghost" size={size}>Book again</Button>}
       <Button as={Link} to={`/customer/help?booking=${encodeURIComponent(booking.reference)}`} variant="ghost" size={size}>Contact support</Button>
@@ -44,6 +47,7 @@ export default function BookingActions({ booking, onChanged, hideView = false, s
         body={<>Booking <strong className="text-white">{booking.reference}</strong> for {booking.vehicle.make} {booking.vehicle.model} will be cancelled. You can only cancel before the pickup has started.</>}
         onConfirm={cancel} onClose={() => setCancelOpen(false)} />
       <ScheduleDeliveryModal booking={booking} open={schedOpen} onClose={() => setSchedOpen(false)} onDone={onChanged} />
+      <RescheduleModal booking={booking} open={moveOpen} onClose={() => setMoveOpen(false)} onDone={onChanged} />
     </div>
   );
 }

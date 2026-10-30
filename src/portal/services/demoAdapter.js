@@ -354,6 +354,19 @@ export const demoAdapter = {
       c.save();
       return view(c.d, b);
     },
+    async reschedule(id, { date, slot }) {
+      await delay(400);
+      const c = ctx();
+      const b = find(c.d, id);
+      if (!['confirmed', 'driver_assigned'].includes(b.status)) throw new E('NOT_ALLOWED', 'The pickup can no longer be changed because the driver is already on the way.');
+      if (!date || date < new Date().toISOString().slice(0, 10) || !SLOTS.includes(slot)) throw new E('INVALID_INPUT', 'Choose a pickup date (today or later) and a time slot.');
+      if (date === b.pickup.date && slot === b.pickup.slot) throw new E('INVALID_INPUT', 'Choose a different date or time slot.');
+      b.pickup = { ...b.pickup, date, slot };
+      b.updatedAt = nowISO();
+      addNote(c.d, b, 'rescheduled', `Pickup moved to ${date}, ${slot}${b.driver ? '. Your driver has been told' : ''} (demo).`);
+      c.save();
+      return view(c.d, b);
+    },
     async scheduleDelivery(id, { date, slot, address }) {
       await delay(400);
       const c = ctx();

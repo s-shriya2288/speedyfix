@@ -48,6 +48,7 @@ export const isTrackable = (b) => b.status !== 'cancelled';
 
 /** Hints for the UI only. The backend must enforce these rules independently. */
 export const canCancelHint = (b) => ['confirmed', 'driver_assigned'].includes(b.status);
+export const canRescheduleHint = canCancelHint;
 export const canScheduleDeliveryHint = (b) => b.status === 'service_completed' && !b.delivery;
 
 /** Which customer handover (if any) is waiting on the customer right now. */
