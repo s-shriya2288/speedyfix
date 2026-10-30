@@ -30,7 +30,7 @@ export default function ConditionReports({ booking: b }) {
   return (
     <Card>
       <CardHeader title="Vehicle condition" />
-      <div className="divide-y divide-white/10">{reports.map((x) => <Report key={x.key} {...x} />)}</div>
+      <div className="divide-y divide-white/10">{reports.map(({ key, ...x }) => <Report key={key} {...x} />)}</div>
     </Card>
   );
 }
