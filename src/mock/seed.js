@@ -50,6 +50,8 @@ function build() {
       statusHistory: history.map(([s, h]) => ({ status: s, at: hoursAgo(h) })), handovers: { pickup: { verifiedAt: null }, delivery: { verifiedAt: null } }, ...extra,
     };
     b.createdAt = b.statusHistory[0].at; b.updatedAt = b.statusHistory[b.statusHistory.length - 1].at;
+    // Without an explicit pickup, the pickup falls on the day the booking was made, not on today.
+    if (!extra.pickup) b.pickup.date = b.createdAt.slice(0, 10);
     blob(uid).bookings.push(b);
     b.statusHistory.forEach((h) => blob(uid).notifications.push({ id: `n_${id}_${h.status}`, bookingId: id, reference: b.reference, type: h.status, message: NOTE[h.status] || h.status, createdAt: h.at, read: true }));
     return b;
