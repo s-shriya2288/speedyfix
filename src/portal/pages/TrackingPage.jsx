@@ -103,7 +103,7 @@ export default function TrackingPage() {
             <Card className="border-amber-400/25">
               <CardHeader title="Demo controls" action={<DemoBadge />} />
               <div className="space-y-3 px-5 py-5">
-                <DemoNotice>In production, drivers and the service center move your booking forward. Here you can simulate their updates to try the flow. Steps that need you (handover codes, scheduling delivery) will wait for you.</DemoNotice>
+                <DemoNotice>In production, drivers and the service center move your booking forward. Here you can simulate their updates to try the flow. At a handover it acts as the driver entering your code. Scheduling delivery still waits for you.</DemoNotice>
                 <Button variant="secondary" onClick={advance} loading={busy} disabled={!isOpen(b)} className="w-full">Simulate the next update</Button>
               </div>
             </Card>

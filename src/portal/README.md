@@ -20,7 +20,7 @@ Add `{portalRoutes()}` (from `src/portal/routes.jsx`) inside your existing `<Rou
 | centers | list |
 | bookings | serviceTypes, list({tab,query,vehicleId,cursor,limit}), summary, get, create(payload, idempotencyKey), cancel, scheduleDelivery |
 | tracking | get (returns booking, lastUpdated, liveLocation = null when there is no GPS) |
-| handover | verify(bookingId, 'pickup' | 'delivery', code), resend |
+| handover | resend(bookingId, 'pickup' | 'delivery'). The pending code is returned on the booking as `handovers.<type>.code`; the driver submits it. |
 | serviceProgress | get (null until the center has the vehicle) |
 | notifications | list, markRead, markAllRead |
 
@@ -38,5 +38,5 @@ Return shapes: see the objects built in `demoAdapter.js`. Map your statuses to t
 Real in the UI and logic: routing and guards, form validation, wizard, duplicate-submit protection, status-dependent actions,
 cancel/OTP/vehicle rules (enforced inside the demo "server" functions), notifications read state, persistence in the browser.
 Simulated: personas (there are no accounts or passwords), service centers, drivers, status progress (use "Simulate the next update"
-on the tracking page), OTP codes (revealed on screen), service progress, delivery slots. Not available: live GPS, SMS/email/push,
+on the tracking page), OTP codes (shown to the customer on screen instead of by SMS), service progress, delivery slots. Not available: live GPS, SMS/email/push,
 payments, maps.

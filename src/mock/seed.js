@@ -18,7 +18,7 @@ const DRIVERS = {
   arun: { id: 'u_seed_driver', name: 'Arun P.', phone: '+91 90000 33333' },
 };
 const NOTE = {
-  confirmed: 'Booking confirmed.', driver_assigned: 'A driver has been assigned to your pickup.', driver_en_route: 'Your driver is on the way. Verify the handover when they arrive.',
+  confirmed: 'Booking confirmed.', driver_assigned: 'A driver has been assigned to your pickup.', driver_en_route: 'Your driver is on the way. Share your handover code with them when they arrive.',
   picked_up: 'Your vehicle has been collected.', in_transit: 'Your vehicle is on its way to the service center.', received_at_center: 'Your vehicle was received by the service center.',
   service_in_progress: 'Service has started on your vehicle.', service_completed: 'Service is complete. Schedule delivery when you are ready.', delivered: 'Your vehicle has been delivered.', cancelled: 'Booking cancelled.',
 };

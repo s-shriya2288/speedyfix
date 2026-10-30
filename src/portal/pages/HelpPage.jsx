@@ -5,7 +5,7 @@ import { ContactList } from '../../landing/components/PartnerCTA';
 
 const FAQ = [
   ['How do I book a pickup?', 'Open Book a Pickup, choose your vehicle and service, enter the pickup address and time, pick a service center, then review and confirm.'],
-  ['What is a handover code?', 'A six-digit one-time code that confirms your vehicle is changing hands, either to the pickup driver or back to you on delivery. Only enter it when the driver is with you.'],
+  ['What is a handover code?', 'A six-digit one-time code that confirms your vehicle is changing hands, either to the pickup driver or back to you on delivery. It appears on your booking when the driver is on the way. Read it out to the driver only when they are with you and your vehicle; the driver enters it to confirm the handover.'],
   ['Can I cancel a booking?', 'You can cancel before the pickup has started. After that, the booking cannot be cancelled from the portal. Contact support instead.'],
   ['Why does tracking show a status, not a map?', 'Tracking shows the last known status of your booking. Live vehicle location is not part of this portal.'],
   ['How do I arrange delivery?', 'When service is completed, a Schedule delivery action appears on the booking. Choose a date, time and address.'],

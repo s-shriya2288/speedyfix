@@ -31,7 +31,7 @@ function ActiveBooking({ b }) {
       <div className="space-y-5 px-5 py-5">
         {needs && (
           <Link to={`/customer/tracking/${b.id}`} className="flex items-center justify-between gap-3 rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm text-amber-100 hover:bg-amber-400/15">
-            <span><strong className="font-semibold">Action needed:</strong> verify the {needs === 'pickup' ? 'pickup' : 'delivery'} handover.</span><ArrowRight className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span><strong className="font-semibold">Action needed:</strong> share your {needs === 'pickup' ? 'pickup' : 'delivery'} handover code with the driver.</span><ArrowRight className="h-4 w-4 shrink-0" aria-hidden="true" />
           </Link>
         )}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
