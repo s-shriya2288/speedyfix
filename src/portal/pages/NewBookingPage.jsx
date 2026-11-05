@@ -72,7 +72,7 @@ function Confirmation({ booking }) {
           <h3 className="font-display text-sm text-white">What happens next</h3>
           <ol className="mt-3 space-y-3 text-sm text-slate-300">
             <li className="flex gap-3"><span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-volt/20 text-xs text-volt-glow">1</span>A driver is assigned to your pickup. Their name and number appear on the booking once assigned.</li>
-            <li className="flex gap-3"><span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-volt/20 text-xs text-volt-glow">2</span>When the driver arrives, you verify the handover with a one-time code.</li>
+            <li className="flex gap-3"><span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-volt/20 text-xs text-volt-glow">2</span>When the driver arrives, you read out your one-time handover code. The driver enters it to confirm the handover.</li>
             <li className="flex gap-3"><span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-volt/20 text-xs text-volt-glow">3</span>Follow your vehicle and the service progress from the tracking page.</li>
           </ol>
         </div>

@@ -2,6 +2,7 @@ import { Check, Circle } from 'lucide-react';
 import { Card, CardHeader, DemoNotice, ErrorState, Skeleton, cx } from '../../ui';
 import { useAsync } from '../../hooks/useAsync';
 import { services } from '../../services';
+import Bill from './Bill';
 
 /** Shows only what the backend returns. Nothing about repairs, diagnostics or technician notes is invented here. */
 export default function ServiceProgress({ bookingId, status, refreshKey }) {
@@ -30,6 +31,7 @@ export default function ServiceProgress({ bookingId, status, refreshKey }) {
                 </li>
               ))}
             </ul>
+            {data.bill && <Bill bill={data.bill} />}
           </>
         )}
       </div>

@@ -9,8 +9,8 @@
  * Server-side requirements (do not rely on this UI for them):
  *  - Every query is scoped to the authenticated customer; never trust a customer id sent by the browser.
  *  - bookings.cancel / scheduleDelivery enforce status rules; bookings.create is idempotent per key.
- *  - handover.verify checks the code on the server (expiry, attempt limits). OTP codes never reach the client
- *    except to the customer who is meant to receive them.
+ *  - Handover codes are generated, expired and attempt-limited on the server. The customer's booking carries the
+ *    pending code (handovers.pickup|delivery.code) so they can read it out; only the driver submits it.
  *  - Booking statuses are mapped to the keys in src/portal/domain/status.js.
  */
 import { ServiceError } from './errors';
@@ -39,10 +39,12 @@ export const remoteAdapter = {
     get: todo('bookings.get'),
     create: todo('bookings.create'),
     cancel: todo('bookings.cancel'),
+    reschedule: todo('bookings.reschedule'),
+    rate: todo('bookings.rate'),
     scheduleDelivery: todo('bookings.scheduleDelivery'),
   },
   tracking: { get: todo('tracking.get') },
-  handover: { verify: todo('handover.verify'), resend: todo('handover.resend') },
+  handover: { resend: todo('handover.resend') },
   serviceProgress: { get: todo('serviceProgress.get') },
   notifications: { list: todo('notifications.list'), markRead: todo('notifications.markRead'), markAllRead: todo('notifications.markAllRead') },
   demo: null,

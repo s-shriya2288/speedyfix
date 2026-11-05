@@ -49,14 +49,14 @@ const NEXT = {
 const NOTE = {
   confirmed: 'Booking confirmed.',
   driver_assigned: 'A driver has been assigned to your pickup.',
-  driver_en_route: 'Your driver is on the way. Verify the handover when they arrive.',
+  driver_en_route: 'Your driver is on the way. Share your handover code with them when they arrive.',
   picked_up: 'Your vehicle has been collected.',
   in_transit: 'Your vehicle is on its way to the service center.',
   received_at_center: 'Your vehicle was received by the service center.',
   service_in_progress: 'Service has started on your vehicle.',
   service_completed: 'Service is complete. Schedule delivery when you are ready.',
   delivery_driver_assigned: 'A driver has been assigned for delivery.',
-  out_for_delivery: 'Your vehicle is out for delivery. Verify the handover when it arrives.',
+  out_for_delivery: 'Your vehicle is out for delivery. Share your handover code with the driver when it arrives.',
   delivered: 'Your vehicle has been delivered.',
   cancelled: 'Booking cancelled.',
 };
@@ -119,7 +119,12 @@ function handoverView(d, b, type) {
   if (Date.now() > otp.expiresAt) return { status: 'expired', attemptsLeft: MAX_ATTEMPTS - otp.attempts };
   return { status: 'pending', expiresAt: new Date(otp.expiresAt).toISOString(), attemptsLeft: MAX_ATTEMPTS - otp.attempts, canResendAt: new Date(otp.issuedAt + RESEND_GAP_MS).toISOString() };
 }
-const view = (d, b) => ({ ...clone(b), handovers: { pickup: handoverView(d, b, 'pickup'), delivery: handoverView(d, b, 'delivery') } });
+/** The customer is the person the code is meant for, so their view carries it. The driver types it in; see the driver adapter. */
+function customerHandover(d, b, type) {
+  const h = handoverView(d, b, type);
+  return h.status === 'pending' ? { ...h, code: d.otps[`${b.id}:${type}`].code } : h;
+}
+const view = (d, b) => ({ ...clone(b), handovers: { pickup: customerHandover(d, b, 'pickup'), delivery: customerHandover(d, b, 'delivery') } });
 const find = (d, id) => {
   const b = d.bookings.find((x) => x.id === id);
   if (!b) throw new E('NOT_FOUND', 'Booking not found.');
@@ -142,6 +147,16 @@ function consumeOtp(d, b, type, code) {
   b.handovers[type] = { verifiedAt: nowISO() };
   delete d.otps[key];
   setStatus(d, b, type === 'pickup' ? 'picked_up' : 'delivered');
+}
+
+const WO_DETAIL = { waiting_parts: 'Waiting for parts', quality_check: 'Quality check' };
+/** The customer's view of a work order's charges: labour at the center's hourly rate plus parts. Final once the work order is completed. */
+function billFor(wo) {
+  if (!wo || (!wo.labour?.length && !wo.parts?.length)) return null;
+  const labour = wo.labour.map((l) => ({ id: l.id, description: l.description || 'Labour', hours: l.hours, rate: l.rate, amount: Math.round(l.hours * l.rate) }));
+  const parts = wo.parts.map((p) => ({ id: p.id, description: p.description, qty: p.qty, unitPrice: p.unitPrice, amount: Math.round(p.qty * p.unitPrice) }));
+  const sum = (xs) => xs.reduce((t, x) => t + x.amount, 0);
+  return { labour, parts, labourTotal: sum(labour), partsTotal: sum(parts), total: sum(labour) + sum(parts), final: wo.status === 'completed' };
 }
 
 // ---------- adapter ----------
@@ -339,6 +354,31 @@ export const demoAdapter = {
       c.save();
       return view(c.d, b);
     },
+    async reschedule(id, { date, slot }) {
+      await delay(400);
+      const c = ctx();
+      const b = find(c.d, id);
+      if (!['confirmed', 'driver_assigned'].includes(b.status)) throw new E('NOT_ALLOWED', 'The pickup can no longer be changed because the driver is already on the way.');
+      if (!date || date < new Date().toISOString().slice(0, 10) || !SLOTS.includes(slot)) throw new E('INVALID_INPUT', 'Choose a pickup date (today or later) and a time slot.');
+      if (date === b.pickup.date && slot === b.pickup.slot) throw new E('INVALID_INPUT', 'Choose a different date or time slot.');
+      b.pickup = { ...b.pickup, date, slot };
+      b.updatedAt = nowISO();
+      addNote(c.d, b, 'rescheduled', `Pickup moved to ${date}, ${slot}${b.driver ? '. Your driver has been told' : ''} (demo).`);
+      c.save();
+      return view(c.d, b);
+    },
+    async rate(id, { service, driver, comment }) {
+      await delay(350);
+      const c = ctx();
+      const b = find(c.d, id);
+      if (b.status !== 'delivered') throw new E('NOT_ALLOWED', 'You can rate a booking once your vehicle is delivered.');
+      if (b.feedback) throw new E('ALREADY_RATED', 'You have already rated this booking.');
+      const ok = (n) => Number.isInteger(n) && n >= 1 && n <= 5;
+      if (!ok(service) || (driver != null && !ok(driver))) throw new E('INVALID_INPUT', 'Choose a rating from 1 to 5 stars.');
+      b.feedback = { service, driver: driver ?? null, comment: (comment || '').trim().slice(0, 500), at: nowISO() };
+      c.save();
+      return view(c.d, b);
+    },
     async scheduleDelivery(id, { date, slot, address }) {
       await delay(400);
       const c = ctx();
@@ -364,15 +404,8 @@ export const demoAdapter = {
     },
   },
 
+  // The customer only receives and re-requests codes. The driver submits the code (driver adapter: handover.verify).
   handover: {
-    async verify(id, type, code) {
-      await delay(450);
-      const c = ctx();
-      const b = find(c.d, id);
-      try { consumeOtp(c.d, b, type, code); } catch (e) { c.save(); throw e; }
-      c.save();
-      return view(c.d, b);
-    },
     async resend(id, type) {
       await delay(300);
       const c = ctx();
@@ -402,7 +435,9 @@ export const demoAdapter = {
         { key: 'complete', label: 'Service completed', state: done ? 'done' : 'todo' },
         { key: 'delivery', label: 'Delivery scheduling', state: b.delivery ? 'done' : done ? 'active' : 'todo', detail: b.delivery ? `${b.delivery.date}, ${b.delivery.slot}` : undefined },
       ];
-      return { source: 'demo', workOrderRef: `WO-DEMO-${b.reference.slice(-5)}`, items, percent: Math.round((items.filter((i) => i.state === 'done').length / items.length) * 100) };
+      const wo = b.workOrder;
+      if (wo && WO_DETAIL[wo.status] && !done) items[1].detail = WO_DETAIL[wo.status];
+      return { source: 'demo', workOrderRef: wo?.reference || `WO-DEMO-${b.reference.slice(-5)}`, items, percent: Math.round((items.filter((i) => i.state === 'done').length / items.length) * 100), bill: billFor(wo) };
     },
   },
 
@@ -433,8 +468,15 @@ export const demoAdapter = {
       const b = find(c.d, id);
       const s = b.status;
       if (s === 'delivered' || s === 'cancelled') return { booking: view(c.d, b), blocked: 'This booking is finished.' };
-      if (s === 'driver_en_route') return { booking: view(c.d, b), blocked: 'Waiting for you to verify the pickup handover.' };
-      if (s === 'out_for_delivery') return { booking: view(c.d, b), blocked: 'Waiting for you to verify the delivery handover.' };
+      if (s === 'driver_en_route' || s === 'out_for_delivery') {
+        // Simulates the driver typing in the code the customer shared with them.
+        const type = s === 'driver_en_route' ? 'pickup' : 'delivery';
+        const h = handoverView(c.d, b, type);
+        if (h.status !== 'pending') return { booking: view(c.d, b), blocked: 'Your handover code has expired or is locked. Request a new code first.' };
+        consumeOtp(c.d, b, type, c.d.otps[`${b.id}:${type}`].code);
+        c.save();
+        return { booking: view(c.d, b) };
+      }
       if (s === 'service_completed') {
         if (!b.delivery) return { booking: view(c.d, b), blocked: 'Waiting for you to schedule delivery.' };
         b.deliveryDriver = { ...DEMO_DRIVER };
@@ -448,11 +490,6 @@ export const demoAdapter = {
       if (b.status === 'out_for_delivery') issueOtp(c.d, b, 'delivery');
       c.save();
       return { booking: view(c.d, b) };
-    },
-    async peekOtp(id, type) {
-      const { d } = ctx();
-      const o = d.otps[`${id}:${type}`];
-      return o ? o.code : null;
     },
     async seedSample() { await delay(300); ctx(); keepSession(seedWorld); },
     async reset() { ctx(); keepSession(clearWorld); },

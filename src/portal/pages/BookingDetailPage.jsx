@@ -7,6 +7,8 @@ import { fmtDate, fmtDateTime } from '../lib/format';
 import BookingActions from '../features/booking/BookingActions';
 import HandoverPanel from '../features/handover/HandoverPanel';
 import ServiceProgress from '../features/service/ServiceProgress';
+import ConditionReports from '../features/booking/ConditionReports';
+import FeedbackCard from '../features/booking/FeedbackCard';
 import { DetailRow, DriverBlock } from '../features/booking/parts';
 
 export default function BookingDetailPage() {
@@ -36,8 +38,10 @@ export default function BookingDetailPage() {
 
       <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
         <div className="space-y-6">
+          <FeedbackCard booking={b} onChanged={changed} />
           <HandoverPanel booking={b} onChanged={changed} />
           <ServiceProgress bookingId={b.id} status={b.status} />
+          <ConditionReports booking={b} />
           <Card>
             <CardHeader title="Booking progress" action={isOpen(b) ? <Link to={`/customer/tracking/${b.id}`} className="text-sm text-volt-glow hover:underline">Open tracking</Link> : null} />
             <div className="px-5 py-5"><StageTimeline booking={b} /></div>
