@@ -151,7 +151,18 @@ function customerHandover(d, b, type) {
   const h = handoverView(d, b, type);
   return h.status === 'pending' ? { ...h, code: d.otps[`${b.id}:${type}`].code } : h;
 }
-const view = (d, b) => ({ ...clone(b), handovers: { pickup: customerHandover(d, b, 'pickup'), delivery: customerHandover(d, b, 'delivery') } });
+/**
+ * The driver's arrival at the center is recorded on the pickup job, while the booking stays "in_transit" until the
+ * center checks the vehicle in. The customer sees that arrival as its own step instead of a stale "In transit".
+ */
+function withCenterArrival(v) {
+  const at = v.pickupJob?.centerArrivedAt || v.pickupJob?.handedOverAt;
+  if (!at) return v;
+  if (v.status === 'in_transit') v.status = 'arrived_at_center';
+  if (!v.statusHistory.some((h) => h.status === 'arrived_at_center')) v.statusHistory = [...v.statusHistory, { status: 'arrived_at_center', at }].sort((a, c) => (a.at < c.at ? -1 : 1));
+  return v;
+}
+const view = (d, b) => withCenterArrival({ ...clone(b), handovers: { pickup: customerHandover(d, b, 'pickup'), delivery: customerHandover(d, b, 'delivery') } });
 const find = (d, id) => {
   const b = d.bookings.find((x) => x.id === id);
   if (!b) throw new E('NOT_FOUND', 'Booking not found.');

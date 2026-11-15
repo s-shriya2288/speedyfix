@@ -13,7 +13,7 @@ export default function ServiceProgress({ bookingId, status, refreshKey }) {
       <div className="space-y-4 px-5 py-5">
         {loading && <><Skeleton className="h-4 w-1/2" /><Skeleton className="h-4 w-2/3" /><Skeleton className="h-4 w-1/3" /></>}
         {error && <ErrorState error={error} onRetry={reload} title="Could not load service progress" />}
-        {!loading && !error && !data && <p className="text-sm text-slate-400">Service progress appears here once the service center receives your vehicle.</p>}
+        {!loading && !error && !data && <p className="text-sm text-slate-400">{status === 'arrived_at_center' ? 'Your vehicle is at the service center. Service progress appears here once the center checks it in.' : 'Service progress appears here once the service center receives your vehicle.'}</p>}
         {data && (
           <>
             {data.source === 'demo' && <DemoNotice>Demonstration data. In production this panel shows your service center's work order, only if it is connected to the portal.</DemoNotice>}

@@ -24,7 +24,8 @@ Add `{portalRoutes()}` (from `src/portal/routes.jsx`) inside your existing `<Rou
 | serviceProgress | get (null until the center has the vehicle) |
 | notifications | list, markRead, markAllRead |
 
-Return shapes: see the objects built in `demoAdapter.js`. Map your statuses to the keys in `domain/status.js`.
+Return shapes: see the objects built in `demoAdapter.js`. Map your statuses to the keys in `domain/status.js`. Return
+`arrived_at_center` once the driver has reached or handed over at the center but the center has not checked the vehicle in yet.
 
 ## Server-side rules the backend must enforce (the UI only hints at them)
 - Every read and write is scoped to the authenticated customer. Never trust a customer id from the browser (with Supabase: RLS
