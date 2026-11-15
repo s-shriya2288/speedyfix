@@ -64,6 +64,33 @@ export const DEMO_DRIVER = { id: 'u_driver_demo', name: 'Karthik S.', phone: '+9
 const MAX_ATTEMPTS = 5;
 const OTP_TTL_MS = 15 * 60 * 1000;
 const RESEND_GAP_MS = 30 * 1000;
+const OFFER_TTL_MS = 5 * 60 * 1000;
+
+// ---------- dispatch (simulated operations) ----------
+/** An offer is open for 5 minutes; after that the driver can no longer accept it. */
+const offerLive = (o) => Boolean(o) && o.status === 'offered' && Date.now() - new Date(o.at).getTime() < OFFER_TTL_MS;
+function notifyDriver(driverId, n) {
+  const k = `driver:${driverId}`;
+  const s = read(k, { availability: 'offline', confirmedAt: null, notifications: [] });
+  s.notifications.unshift({ id: `n_${rid()}`, createdAt: nowISO(), read: false, ...n });
+  write(k, s);
+}
+/**
+ * Offers a job leg to every approved driver who is online, as operations would when a booking comes in. The first
+ * driver to accept gets it (enforced in the driver adapter). Returns how many drivers were offered the job.
+ */
+function dispatchOffers(b, type) {
+  const drivers = read('users', []).filter((u) => u.role === 'driver' && u.active !== false && (u.driverStatus || 'approved') === 'approved' && read(`driver:${u.id}`, {}).availability === 'online');
+  let sent = 0;
+  for (const u of drivers) {
+    const mine = (b.offers || []).filter((o) => o.job === type && o.driverId === u.id);
+    if (mine.some((o) => o.status !== 'offered' || offerLive(o))) continue; // already answered, or still open
+    (b.offers = b.offers || []).push({ job: type, driverId: u.id, status: 'offered', at: nowISO(), by: 'dispatch' });
+    notifyDriver(u.id, { jobId: `${b.id}~${type}`, reference: b.reference, type: 'offer', message: `New ${type} offer: ${b.reference}. Answer within 5 minutes.` });
+    sent += 1;
+  }
+  return sent;
+}
 
 // ---------- session + per-user data ----------
 /** Re-seeding or clearing wipes storage, so keep the current preview session. */
@@ -341,6 +368,7 @@ export const demoAdapter = {
       };
       c.d.bookings.push(b);
       addNote(c.d, b, 'confirmed', `Booking ${b.reference} confirmed (demo).`);
+      if (!dispatchOffers(b, 'pickup')) addNote(c.d, b, 'dispatch_waiting', 'No driver is online right now. Operations will assign one (demo).');
       if (idempotencyKey) c.d.idem[idempotencyKey] = b.id;
       c.save();
       return view(c.d, b);
@@ -364,6 +392,7 @@ export const demoAdapter = {
       b.pickup = { ...b.pickup, date, slot };
       b.updatedAt = nowISO();
       addNote(c.d, b, 'rescheduled', `Pickup moved to ${date}, ${slot}${b.driver ? '. Your driver has been told' : ''} (demo).`);
+      if (b.driver) notifyDriver(b.driver.id, { jobId: `${b.id}~pickup`, reference: b.reference, type: 'rescheduled', message: `${b.reference}: the customer moved the pickup to ${date}, ${slot}.` });
       c.save();
       return view(c.d, b);
     },
@@ -389,6 +418,7 @@ export const demoAdapter = {
       b.delivery = { date, slot, address: address.trim() };
       b.updatedAt = nowISO();
       addNote(c.d, b, 'delivery_scheduled', `Delivery requested for ${date}, ${slot} (demo).`);
+      dispatchOffers(b, 'delivery');
       c.save();
       return view(c.d, b);
     },
@@ -497,4 +527,4 @@ export const demoAdapter = {
 };
 
 /** Used by the demo driver adapter so both portals read and write the same simulated booking records. */
-export const demoInternals = { keepSession, seedWorld, clearWorld, CENTERS, allCenters, centerAvailable, NOTE, NS, read, write, delay, rid, nowISO, issueOtp, setStatus, addNote, consumeOtp, handoverView, SLOTS, sessionUser, publicUser };
+export const demoInternals = { OFFER_TTL_MS, offerLive, notifyDriver, dispatchOffers, keepSession, seedWorld, clearWorld, CENTERS, allCenters, centerAvailable, NOTE, NS, read, write, delay, rid, nowISO, issueOtp, setStatus, addNote, consumeOtp, handoverView, SLOTS, sessionUser, publicUser };

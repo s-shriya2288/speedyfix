@@ -437,7 +437,7 @@ export const demoAdminAdapter = {
       for (const e of entries()) {
         const { b } = e; const s = summary(e, P.settings);
         const decl = (t) => (b.offers || []).filter((o) => o.job === t && o.status === 'declined').map((o) => ({ driver: users().find((u) => u.id === o.driverId)?.name || o.driverId, reason: o.reason || '', at: o.at }));
-        const mk = (type, state, assignee) => ({ jobId: `${b.id}~${type}`, type, booking: s, assignee, state, waitingMinutes: Math.round(mins(type === 'pickup' ? b.createdAt : b.delivery?.requestedAt || b.updatedAt)), pickupAddress: type === 'pickup' ? [b.pickup.address, b.pickup.city].filter(Boolean).join(', ') : b.center.address, destination: type === 'pickup' ? b.center.address : b.delivery?.address, declines: decl(type), offered: (b.offers || []).some((o) => o.job === type && o.status === 'offered'), reassignable: type === 'pickup' ? ['driver_assigned', 'driver_en_route'].includes(b.status) : ['delivery_driver_assigned', 'out_for_delivery'].includes(b.status) });
+        const mk = (type, state, assignee) => ({ jobId: `${b.id}~${type}`, type, booking: s, assignee, state, waitingMinutes: Math.round(mins(type === 'pickup' ? b.createdAt : b.delivery?.requestedAt || b.updatedAt)), pickupAddress: type === 'pickup' ? [b.pickup.address, b.pickup.city].filter(Boolean).join(', ') : b.center.address, destination: type === 'pickup' ? b.center.address : b.delivery?.address, declines: decl(type), offered: (b.offers || []).some((o) => o.job === type && X.offerLive(o)), reassignable: type === 'pickup' ? ['driver_assigned', 'driver_en_route'].includes(b.status) : ['delivery_driver_assigned', 'out_for_delivery'].includes(b.status) });
         if (b.status === 'confirmed' && !b.driver) items.push(mk('pickup', 'unassigned', null));
         else if (b.driver && b.status !== 'cancelled') items.push(mk('pickup', 'assigned', { id: b.driver.id, name: b.driver.name }));
         if (b.status === 'service_completed' && b.delivery && !b.deliveryDriver) items.push(mk('delivery', 'unassigned', null));
@@ -506,7 +506,7 @@ export const demoAdminAdapter = {
       if (!free) throw new E('NOT_ALLOWED', 'This job is not waiting for a driver.');
       const el = (await this.eligibleDrivers(jobId)).find((d) => d.id === driverId);
       if (!el?.eligible) throw new E('NOT_ELIGIBLE', el ? el.reasons.join('. ') : 'Driver not found.');
-      if ((b.offers || []).some((o) => o.job === type && o.driverId === driverId && o.status === 'offered')) throw new E('ALREADY_OFFERED', 'This driver already has an open offer for this job.');
+      if ((b.offers || []).some((o) => o.job === type && o.driverId === driverId && X.offerLive(o))) throw new E('ALREADY_OFFERED', 'This driver already has an open offer for this job.');
       (b.offers = b.offers || []).push({ job: type, driverId, status: 'offered', at: nowISO(), by: me.id });
       write(e.key, e.d);
       audit(me, 'assignment.offered', 'booking', bookingId, { after: { driver: el.name, job: type } });

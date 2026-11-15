@@ -24,7 +24,9 @@ OTP verification is separate (`handover.verify`) because it must be checked on t
 ## What the backend must enforce (the UI only hints)
 1. Identity and role come from the verified session. A driver role can only be set by an admin/service process, never by a client form.
 2. A driver reads only jobs offered or assigned to their own account. Another driver's job looks like "not found".
-3. Offers: accept is atomic ("first accepted wins", reject with ALREADY_TAKEN); decline requires a reason; drivers cannot assign themselves.
+3. Offers: when a booking (or a delivery request) comes in, it is offered to approved drivers who are online. An offer is open for
+   5 minutes (OFFER_EXPIRED after that). Accept is atomic ("first accepted wins", reject with ALREADY_TAKEN); decline requires a reason;
+   drivers cannot assign themselves.
 4. Transitions follow a state machine, reject out-of-order steps, and reject a request whose `expectedPhase` is no longer current.
 5. Pickup/delivery cannot complete without (a) a saved condition record and (b) a successful server-side OTP check. Codes are hashed,
    expire, and are attempt-limited. The browser never receives the correct code.

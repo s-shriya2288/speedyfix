@@ -48,7 +48,8 @@ function locate(bookingId) {
   }
   return null;
 }
-const offerFor = (b, type, me) => (b.offers || []).find((o) => o.job === type && o.driverId === me);
+// The latest offer counts: an expired offer can be followed by a new one.
+const offerFor = (b, type, me) => [...(b.offers || [])].reverse().find((o) => o.job === type && o.driverId === me);
 
 // ---------- phase (the authoritative job state, derived from the booking record) ----------
 const AFTER_CENTER = ['received_at_center', 'service_in_progress', 'service_completed', 'delivery_driver_assigned', 'out_for_delivery', 'delivered'];
@@ -57,7 +58,7 @@ function phaseOf(b, type, me) {
   if (type === 'pickup') {
     if (offer?.status === 'declined' && b.driver?.id !== me) return 'declined';
     if (b.status === 'cancelled') return b.driver?.id === me || offer ? 'cancelled' : null;
-    if (!b.driver) return offer?.status === 'offered' && b.status === 'confirmed' ? 'offered' : null;
+    if (!b.driver) return X.offerLive(offer) && b.status === 'confirmed' ? 'offered' : null;
     if (b.driver.id !== me) return null;
     const j = b.pickupJob || {};
     if (AFTER_CENTER.includes(b.status) || j.handedOverAt) return 'handed_over';
@@ -70,7 +71,7 @@ function phaseOf(b, type, me) {
   if (!b.delivery) return null;
   if (offer?.status === 'declined' && b.deliveryDriver?.id !== me) return 'declined';
   if (b.status === 'cancelled') return null;
-  if (!b.deliveryDriver) return offer?.status === 'offered' && b.status === 'service_completed' ? 'offered' : null;
+  if (!b.deliveryDriver) return X.offerLive(offer) && b.status === 'service_completed' ? 'offered' : null;
   if (b.deliveryDriver.id !== me) return null;
   const j = b.deliveryJob || {};
   if (b.status === 'delivery_driver_assigned') return 'accepted';
@@ -113,6 +114,7 @@ function build(blob, b, type, me) {
     instructions: reveal ? [b.serviceNotes, p.instructions].filter(Boolean).join(' / ') : '',
     center,
     timestamps: { offeredAt: offer?.at, ...jobData },
+    offerExpiresAt: phase === 'offered' ? new Date(new Date(offer.at).getTime() + X.OFFER_TTL_MS).toISOString() : null,
     inspection: jobData.inspection || null,
     handover: { status: hv.status, verifiedAt: hv.verifiedAt, attemptsLeft: hv.attemptsLeft },
     history: log.map((l) => ({ event: l.event, label: EVENT_LABEL[l.event] || l.event, at: l.at })),
@@ -233,6 +235,7 @@ export const demoDriverAdapter = {
       if (!phase) {
         const taken = (type === 'pickup' ? b.driver : b.deliveryDriver);
         if (action === 'accept' && taken && taken.id !== me.id) throw new E('ALREADY_TAKEN', 'Another driver has already accepted this job.');
+        if (action === 'accept' && offerFor(b, type, me.id)?.status === 'offered') throw new E('OFFER_EXPIRED', 'This offer has expired. Offers are open for 5 minutes, after which operations offers the job again.');
         throw new E('NOT_FOUND', 'This job was not found, or it is not assigned to you.');
       }
       if (expectedPhase && expectedPhase !== phase) throw new E('STALE', 'This job has changed since you opened it. The latest state has been loaded.', { phase });
@@ -341,18 +344,19 @@ export const demoDriverAdapter = {
       const me = ME();
       requireApproved(me);
       if (dstate(me.id).availability !== 'online') throw new E('OFFLINE', 'Go online first. Offers only reach drivers who are online.');
-      for (const { key, d } of blobs()) {
-        for (const b of d.bookings) {
-          if (offerFor(b, type, me.id)) continue;
-          const free = type === 'pickup' ? b.status === 'confirmed' && !b.driver : b.status === 'service_completed' && b.delivery && !b.deliveryDriver;
-          if (!free) continue;
-          (b.offers = b.offers || []).push({ job: type, driverId: me.id, status: 'offered', at: nowISO() });
-          logEvent(b, type, 'offered', me.id);
-          write(key, d);
-          const job = build({ key, d }, b, type, me.id);
-          notify(me.id, job, 'offer', `New ${type} offer: ${job.reference}.`);
-          return job;
-        }
+      // Newest booking first, so the booking just made in the customer portal is the one offered.
+      const all = blobs().flatMap(({ key, d }) => d.bookings.map((b) => ({ key, d, b }))).sort((x, y) => (x.b.createdAt < y.b.createdAt ? 1 : -1));
+      for (const { key, d, b } of all) {
+        const prev = offerFor(b, type, me.id);
+        if (prev && (prev.status !== 'offered' || X.offerLive(prev))) continue;
+        const free = type === 'pickup' ? b.status === 'confirmed' && !b.driver : b.status === 'service_completed' && b.delivery && !b.deliveryDriver;
+        if (!free) continue;
+        (b.offers = b.offers || []).push({ job: type, driverId: me.id, status: 'offered', at: nowISO() });
+        logEvent(b, type, 'offered', me.id);
+        write(key, d);
+        const job = build({ key, d }, b, type, me.id);
+        notify(me.id, job, 'offer', `New ${type} offer: ${job.reference}.`);
+        return job;
       }
       throw new E('NOTHING_TO_OFFER', type === 'pickup' ? 'No unassigned booking to offer. Create a booking in the customer portal first.' : 'No delivery is waiting for a driver. Schedule a delivery on a completed booking in the customer portal first.');
     },

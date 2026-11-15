@@ -5,7 +5,7 @@ import { fmtDate, fmtDateTime } from '../../portal/lib/format';
 import { TYPE_LABEL, groupOf, mapsUrl } from '../domain/jobs';
 import { useJob } from '../hooks/useJob';
 import JobGate, { StickyAction } from '../features/JobGate';
-import { PhaseBadge, Route, TypeBadge } from '../features/JobCard';
+import { PhaseBadge, Route, TypeBadge, OfferTimer } from '../features/JobCard';
 import PrimaryAction from '../features/PrimaryAction';
 import JobOfferActions from '../features/JobOfferActions';
 import Workflow from '../features/Workflow';
@@ -35,6 +35,7 @@ function Detail({ job, apply }) {
         <p className="text-slate-300">{job.vehicle.make} {job.vehicle.model} · <span className="font-mono tracking-wider">{job.vehicle.registration}</span> · {job.vehicle.type}</p>
         {group === 'cancelled' && <InlineAlert className="mt-4">The customer cancelled this booking. No further action is needed.</InlineAlert>}
         {group === 'offers' && <InlineAlert tone="amber" className="mt-4">This is a new offer. Full address and customer contact are shown after you accept.</InlineAlert>}
+        {group === 'offers' && <OfferTimer expiresAt={job.offerExpiresAt} />}
       </Card>
 
       <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">

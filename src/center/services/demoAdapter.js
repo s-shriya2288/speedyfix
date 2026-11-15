@@ -512,6 +512,7 @@ export const demoCenterAdapter = {
       e.b.delivery = { date, slot, address: address.trim(), notes: String(notes || '').trim(), requestedBy: 'center', requestedAt: nowISO(), key: idempotencyKey || null };
       e.b.updatedAt = nowISO();
       X.addNote(e.d, e.b, 'delivery_scheduled', `The service center requested delivery for ${date}, ${slot}.`);
+      X.dispatchOffers(e.b, 'delivery');
       audit(e.b, me, 'delivery.requested');
       write(e.key, e.d);
       return bookingDetail(me, cstate(me.centerId), e);

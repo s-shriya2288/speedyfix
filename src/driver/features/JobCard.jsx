@@ -1,5 +1,6 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Calendar, MapPin } from 'lucide-react';
+import { ArrowRight, Calendar, MapPin, Timer } from 'lucide-react';
 import { Badge, Card, DemoBadge, cx } from '../../portal/ui';
 import { fmtDate } from '../../portal/lib/format';
 import { TYPE_LABEL, groupOf, phaseLabel } from '../domain/jobs';
@@ -26,6 +27,20 @@ export function Route({ job, dense }) {
   );
 }
 
+/** Time left to answer an offer. The server rejects an accept after expiry; this is only a countdown. */
+export function OfferTimer({ expiresAt }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
+  if (!expiresAt) return null;
+  const left = Math.max(0, Math.floor((new Date(expiresAt).getTime() - now) / 1000));
+  return (
+    <p className={cx('mt-3 inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-sm', left > 60 ? 'bg-amber-400/10 text-amber-200' : 'bg-rose-500/10 text-rose-200')}>
+      <Timer className="h-4 w-4" aria-hidden="true" />
+      {left ? <>Answer within <span className="tabular-nums">{Math.floor(left / 60)}:{String(left % 60).padStart(2, '0')}</span></> : 'Offer expired'}
+    </p>
+  );
+}
+
 /** A job summary. Offers carry Accept/Decline; accepted and active jobs carry their next step. */
 export default function JobCard({ job, onChanged, showAction = true }) {
   const group = groupOf(job.phase);
@@ -44,6 +59,7 @@ export default function JobCard({ job, onChanged, showAction = true }) {
         <span className="inline-flex items-center gap-1.5"><Calendar className="h-4 w-4 text-slate-400" aria-hidden="true" />{fmtDate(job.schedule.date)}, {job.schedule.slot}</span>
         {job.customer && <span className="inline-flex items-center gap-1.5"><MapPin className="h-4 w-4 text-slate-400" aria-hidden="true" />{job.customer.name}</span>}
       </div>
+      {group === 'offers' && <OfferTimer expiresAt={job.offerExpiresAt} />}
       {job.instructions && <p className="mt-3 line-clamp-2 rounded-lg bg-white/[.04] px-3 py-2 text-sm text-slate-300">{job.instructions}</p>}
       {showAction && ['offers', 'assigned', 'in_progress'].includes(group) && (
         <div className="mt-4 space-y-2">
