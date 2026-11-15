@@ -12,9 +12,21 @@ Items parked for later review. Tick them off as they are done.
       provider, a database, and SMS delivery for handover codes. Each portal's `services/remoteAdapter.js` lists the
       methods to implement.
 
-## Done on `feature/customer-portal-improvements` (not merged to main yet)
+## Driver portal
+- [ ] **Live GPS tracking** of the driver for the customer and operations. Needs location permission and a backend to relay it.
+- [ ] **Driver earnings and trip pay.** Needs the per-trip rate (the briefing leaves it blank: `₹__ per trip`).
+- [ ] **Photo storage.** Handover photos are kept in the browser in demo mode; a backend should upload them to storage.
+
+## Done: customer portal (live)
 - [x] Handover code shown to the customer; the driver enters it.
 - [x] Demo pickup dates follow the booking date.
 - [x] Charges (labour, parts, total) and vehicle condition reports on a booking.
 - [x] Change pickup time before the driver sets off.
 - [x] Rate the service and driver after delivery.
+
+## Done: driver portal
+- [x] New bookings and delivery requests are offered automatically to online drivers.
+- [x] Offers expire after 5 minutes, with a countdown.
+- [x] "Simulate a pickup offer" offers the newest booking.
+- [x] The driver is told when the customer changes the pickup time.
+- [x] Up to 4 vehicle photos at each handover, visible to the customer.
