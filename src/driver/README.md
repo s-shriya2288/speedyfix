@@ -53,4 +53,7 @@ create policy driver_reads_own on job_assignments for select using (driver_id = 
 --   driver_verify_handover(p_assignment uuid, p_code text)    -- compares a hash, enforces expiry and attempts, same transaction as the status change
 -- Roles live in a table writable only by the service role; storage buckets for photos need per-assignment policies.
 ```
-Not built: photo upload (no storage integration exists), live GPS, push/SMS/email, earnings or ratings (no business model supplied).
+Photos: the inspection form downscales up to 4 photos in the browser and the demo stores them on the booking as data URLs. A backend
+should upload them to storage (per-assignment access) and keep only the URLs on the record.
+
+Not built: live GPS, push/SMS/email, earnings or ratings (no business model supplied).

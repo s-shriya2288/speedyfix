@@ -151,7 +151,9 @@ function validateInspection(i = {}) {
   if (!['none', 'present'].includes(i.visibleDamage)) miss.push('visible damage');
   if (miss.length) throw new E('INVALID_INPUT', `Complete the required checks: ${miss.join(', ')}.`);
   if ((i.scratches === 'present' || i.visibleDamage === 'present' || i.exterior === 'damage') && !String(i.notes || '').trim()) throw new E('INVALID_INPUT', 'Describe the existing damage in the notes.');
-  return { exterior: i.exterior, scratches: i.scratches, visibleDamage: i.visibleDamage, fuel: i.fuel || '', accessories: String(i.accessories || '').trim(), notes: String(i.notes || '').trim(), photos: [], at: nowISO() };
+  const photos = Array.isArray(i.photos) ? i.photos : [];
+  if (photos.length > 4 || photos.some((p) => typeof p !== 'string' || !p.startsWith('data:image/') || p.length > 600000)) throw new E('INVALID_INPUT', 'Attach up to 4 photos.');
+  return { exterior: i.exterior, scratches: i.scratches, visibleDamage: i.visibleDamage, fuel: i.fuel || '', accessories: String(i.accessories || '').trim(), notes: String(i.notes || '').trim(), photos, at: nowISO() };
 }
 
 export const demoDriverAdapter = {

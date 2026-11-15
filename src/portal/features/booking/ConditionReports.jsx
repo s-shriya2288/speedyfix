@@ -14,6 +14,7 @@ function Report({ title, by, r }) {
         <div><dt className="text-xs text-slate-400">Fuel level</dt><dd className="text-white">{r.fuel || 'Not checked'}</dd></div>
         {r.accessories && <div className="sm:col-span-2"><dt className="text-xs text-slate-400">Items noted</dt><dd className="text-white">{r.accessories}</dd></div>}
         {r.notes && <div className="sm:col-span-2"><dt className="text-xs text-slate-400">Notes</dt><dd className="text-white">{r.notes}</dd></div>}
+        {r.photos?.length > 0 && <div className="sm:col-span-2"><dt className="text-xs text-slate-400">Photos</dt><dd className="mt-1 flex flex-wrap gap-2">{r.photos.map((src, i) => <a key={i} href={src} target="_blank" rel="noreferrer"><img src={src} alt={`${title}: photo ${i + 1}`} className="h-20 w-20 rounded-lg border border-white/10 object-cover" /></a>)}</dd></div>}
       </dl>
     </div>
   );
