@@ -1,14 +1,16 @@
 import { useState } from 'react';
+import { slotPassed } from '../domain/model';
 import { Link, useParams } from 'react-router-dom';
 import { Phone } from 'lucide-react';
 import { centerServices } from '../services';
 import { useAsync, usePolling } from '../../portal/hooks/useAsync';
 import { Badge, Button, Card, CardHeader, ConfirmDialog, ErrorState, InlineAlert, Modal, SelectField, Skeleton, TextAreaField, TextField, useToast } from '../../portal/ui';
-import { fmtDate, fmtDateTime, todayISO } from '../../portal/lib/format';
+import { fmtDate, fmtDateTime, fmtTime, todayISO } from '../../portal/lib/format';
 import { notifyChanged } from '../../portal/lib/events';
-import { BookingBadge, PriorityBadge, WoBadge, money } from '../features/badges';
+import { BookingBadge, LateBadge, PriorityBadge, WoBadge, money } from '../features/badges';
 import ReceivingPanel from '../features/ReceivingPanel';
 import DeliveryRequestForm from '../features/DeliveryRequestForm';
+import HandoverRecords from '../features/HandoverRecords';
 import { useCenter } from '../layout/CenterContext';
 
 const Row = ({ k, children }) => <div className="grid gap-0.5 py-2.5 sm:grid-cols-[9rem_1fr] sm:gap-4"><dt className="text-sm text-slate-400">{k}</dt><dd className="text-sm text-slate-100">{children || <span className="text-slate-400">Not provided</span>}</dd></div>;
@@ -28,7 +30,7 @@ function EditModal({ booking, open, onClose, onSaved }) {
     <Modal open={open} onClose={busy ? () => {} : onClose} title="Update booking" footer={<><Button variant="secondary" onClick={onClose} disabled={busy}>Cancel</Button><Button onClick={save} loading={busy}>Save changes</Button></>}>
       <div className="space-y-4">
         {error && <InlineAlert>{error}</InlineAlert>}
-        <div className="grid gap-4 sm:grid-cols-2"><TextField label="Pickup date" type="date" min={todayISO()} value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} /><SelectField label="Time slot" value={f.slot} onChange={(e) => setF({ ...f, slot: e.target.value })}>{SLOTS.map((s) => <option key={s}>{s}</option>)}</SelectField></div>
+        <div className="grid gap-4 sm:grid-cols-2"><TextField label="Pickup date" type="date" min={todayISO()} value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} /><SelectField label="Time slot" value={f.slot} onChange={(e) => setF({ ...f, slot: e.target.value })}>{SLOTS.map((s) => <option key={s} value={s} disabled={slotPassed(f.date, s)}>{s}{slotPassed(f.date, s) ? ' (already passed)' : ''}</option>)}</SelectField></div>
         <SelectField label="Priority" value={f.priority} onChange={(e) => setF({ ...f, priority: e.target.value })}><option value="normal">Normal</option><option value="urgent">Urgent</option></SelectField>
         <TextField label="Landmark" value={f.landmark} onChange={(e) => setF({ ...f, landmark: e.target.value })} />
         <TextAreaField label="Instructions" value={f.instructions} onChange={(e) => setF({ ...f, instructions: e.target.value })} />
@@ -56,11 +58,10 @@ export default function BookingDetailPage() {
     try { const u = await centerServices.bookings.cancel(b.id); notifyChanged(); toast.push({ title: 'Booking cancelled', message: b.reference }); setCancel({ open: false, busy: false, error: '' }); changed(u); }
     catch (e) { setCancel({ open: true, busy: false, error: e.message }); changed(); }
   };
-  const h = b.handovers;
   return (
     <div className="space-y-6">
       <Card className="p-5">
-        <div className="flex flex-wrap items-center gap-2"><BookingBadge statusKey={b.statusKey} /><PriorityBadge priority={b.priority} />{b.demo && <Badge tone="amber">Demo</Badge>}{b.createdBy === 'center' && <Badge>Created by your center</Badge>}</div>
+        <div className="flex flex-wrap items-center gap-2"><BookingBadge statusKey={b.statusKey} /><LateBadge late={b.late} /><PriorityBadge priority={b.priority} />{b.demo && <Badge tone="amber">Demo</Badge>}{b.createdBy === 'center' && <Badge>Created by your center</Badge>}</div>
         <h2 className="mt-3 font-display text-2xl text-white">{b.reference}</h2>
         <p className="text-slate-300">{b.vehicle.registration} · {b.vehicle.make} {b.vehicle.model} · {b.customer.name}</p>
         <div className="mt-4 flex flex-wrap gap-2">
@@ -70,6 +71,15 @@ export default function BookingDetailPage() {
           {b.workOrder && can('wo.progress') && <Button as={Link} to={`/service-center/work-orders/${b.workOrder.id}`} variant="secondary" size="sm">Open work order</Button>}
         </div>
       </Card>
+
+      {b.late && <InlineAlert>{b.late.text}. Call the {b.late.kind === 'pickup' ? (b.driver ? 'driver' : 'customer') : (b.deliveryDriver ? 'delivery driver' : 'customer')} from the booking details below.</InlineAlert>}
+      {b.dispatch && (
+        <InlineAlert tone={b.dispatch.liveOffers ? 'blue' : 'amber'}>
+          {b.dispatch.liveOffers
+            ? <>Offered to {b.dispatch.liveOffers} online driver{b.dispatch.liveOffers === 1 ? '' : 's'} for the {b.dispatch.type}. The first to accept gets the job; offers expire at {fmtTime(b.dispatch.expiresAt)}.</>
+            : <>No driver has accepted the {b.dispatch.type} yet and no offer is open. Speedy Fix operations will assign a driver.</>}
+        </InlineAlert>
+      )}
 
       <ReceivingPanel booking={b} onChanged={changed} />
 
@@ -86,15 +96,7 @@ export default function BookingDetailPage() {
               <Row k="Delivery">{b.delivery ? `${fmtDate(b.delivery.date)}, ${b.delivery.slot} · ${b.delivery.address}` : null}</Row>
               <Row k="Delivery driver">{b.deliveryDriver ? <span className="flex flex-wrap items-center gap-3">{b.deliveryDriver.name}<Call phone={b.deliveryDriver.phone} /></span> : null}</Row>
             </dl></Card>
-          <Card><CardHeader title="Handover records" />
-            <div className="divide-y divide-white/10">
-              {[['Pickup handover (customer to driver)', h.pickup], ['Delivery handover (driver to customer)', h.delivery]].map(([label, r]) => (
-                <div key={label} className="px-5 py-4 text-sm"><div className="flex items-center justify-between gap-3"><span className="text-white">{label}</span>{r.verifiedAt ? <Badge tone="green">Verified with OTP</Badge> : <Badge>Not yet</Badge>}</div>
-                  {r.verifiedAt && <p className="mt-1 text-xs text-slate-400">Verified {fmtDateTime(r.verifiedAt)} by the driver with the customer's code.</p>}
-                  {r.driverCondition && <p className="mt-1 text-xs text-slate-400">Driver's condition record: exterior {r.driverCondition.exterior}, scratches {r.driverCondition.scratches}{r.driverCondition.notes ? `, "${r.driverCondition.notes}"` : ''}.</p>}</div>
-              ))}
-              <p className="px-5 py-3 text-xs text-slate-400">Vehicle photos are not available in this build. Handovers are completed by drivers; the service center cannot verify or override them.</p>
-            </div></Card>
+          <HandoverRecords steps={b.handoverSteps} />
           {b.workOrderFull && (
             <Card><CardHeader title="Work order" action={<WoBadge status={b.workOrderFull.status} />} />
               <dl className="divide-y divide-white/10 px-5"><Row k="Reference">{b.workOrderFull.reference}</Row><Row k="Technician">{b.workOrderFull.technician?.name}</Row><Row k="Labour">{money(b.workOrderFull.totals.labour)} ({b.workOrderFull.totals.labourHours} h)</Row><Row k="Parts">{money(b.workOrderFull.totals.parts)}</Row><Row k="Total (workshop cost record)">{money(b.workOrderFull.totals.total)}</Row></dl></Card>

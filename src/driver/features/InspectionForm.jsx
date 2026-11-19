@@ -1,6 +1,5 @@
-import { useRef, useState } from 'react';
-import { Camera, X as XIcon } from 'lucide-react';
-import { MAX_PHOTOS, compressPhoto } from '../lib/photos';
+import { useState } from 'react';
+import PhotoPicker from './PhotoPicker';
 import { Badge, Button, InlineAlert, SelectField, TextAreaField, TextField, cx, useToast } from '../../portal/ui';
 import { driverServices } from '../services';
 import { notifyChanged } from '../../portal/lib/events';
@@ -28,21 +27,12 @@ function Choice({ legend, name, value, onChange, options, required, error }) {
 export default function InspectionForm({ job, onSaved }) {
   const toast = useToast();
   const [f, setF] = useState({ exterior: '', scratches: '', visibleDamage: '', fuel: '', accessories: '', notes: '', photos: [] });
-  const [photoError, setPhotoError] = useState('');
-  const fileRef = useRef(null);
   const [errors, setErrors] = useState({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const set = (k) => (v) => setF((x) => ({ ...x, [k]: v }));
   const damaged = f.exterior === 'damage' || f.scratches === 'present' || f.visibleDamage === 'present';
 
-  const addPhotos = async (e) => {
-    const files = [...e.target.files].slice(0, MAX_PHOTOS - f.photos.length);
-    e.target.value = '';
-    setPhotoError('');
-    try { const shots = await Promise.all(files.map(compressPhoto)); setF((x) => ({ ...x, photos: [...x.photos, ...shots].slice(0, MAX_PHOTOS) })); }
-    catch (err) { setPhotoError(err.message); }
-  };
 
   const submit = async (e) => {
     e.preventDefault();
@@ -69,25 +59,7 @@ export default function InspectionForm({ job, onSaved }) {
         <TextField label={<span className="flex items-center gap-2">Items received <Opt /></span>} value={f.accessories} onChange={(e) => set('accessories')(e.target.value)} placeholder="Spare key, documents, mats" />
       </div>
       <TextAreaField label={<span className="flex items-center gap-2">Notes {damaged ? <Req /> : <Opt />}</span>} value={f.notes} onChange={(e) => set('notes')(e.target.value)} error={errors.notes} hint={damaged ? 'Describe where the damage is and how it looks.' : undefined} />
-      <fieldset>
-        <legend className="mb-2 flex items-center gap-2 text-sm font-medium text-white">Photos <Opt /></legend>
-        <p className="mb-3 text-xs text-slate-400">Up to {MAX_PHOTOS}. Take each side of the vehicle and close-ups of any damage. The customer sees them on their booking.</p>
-        <div className="flex flex-wrap gap-2">
-          {f.photos.map((src, i) => (
-            <div key={i} className="relative">
-              <img src={src} alt={`Vehicle photo ${i + 1}`} className="h-20 w-20 rounded-lg border border-white/10 object-cover" />
-              <button type="button" onClick={() => setF((x) => ({ ...x, photos: x.photos.filter((_, j) => j !== i) }))} aria-label={`Remove photo ${i + 1}`} className="absolute -right-2 -top-2 grid h-6 w-6 place-items-center rounded-full bg-rose-500 text-white"><XIcon className="h-3.5 w-3.5" aria-hidden="true" /></button>
-            </div>
-          ))}
-          {f.photos.length < MAX_PHOTOS && (
-            <button type="button" onClick={() => fileRef.current?.click()} className="grid h-20 w-20 place-items-center rounded-lg border border-dashed border-white/20 text-slate-300 hover:bg-white/5">
-              <span className="flex flex-col items-center gap-1 text-xs"><Camera className="h-5 w-5" aria-hidden="true" />Add photo</span>
-            </button>
-          )}
-        </div>
-        <input ref={fileRef} type="file" accept="image/*" capture="environment" multiple className="sr-only" onChange={addPhotos} aria-label="Add vehicle photos" />
-        {photoError && <p role="alert" className="mt-1.5 text-xs text-rose-300">{photoError}</p>}
-      </fieldset>
+      <PhotoPicker photos={f.photos} onChange={(photos) => setF((x) => ({ ...x, photos }))} hint="Take each side of the vehicle and close-ups of any damage. The customer sees them on their booking." />
       <Button type="submit" size="lg" className="w-full" loading={busy}>Save condition record</Button>
     </form>
   );

@@ -17,6 +17,14 @@ Items parked for later review. Tick them off as they are done.
 - [ ] **Driver earnings and trip pay.** Needs the per-trip rate (the briefing leaves it blank: `₹__ per trip`).
 - [ ] **Photo storage.** Handover photos are kept in the browser in demo mode; a backend should upload them to storage.
 
+## Service center portal
+- [ ] **OTP at the center handovers.** The briefing says 4 codes per round trip. Today the two center handovers are confirmed by
+      staff (receiving checklist, and the delivery driver setting off). Decide whether the center should also get a code by SMS.
+- [ ] **Staff confirm handing the car to the delivery driver.** Currently recorded when the driver sets off.
+- [ ] **Works offline** (save work-order updates on the phone, sync later) and **PIN lock**. Both need the real app build.
+- [ ] **A login for each staff member.** Roles exist (manager, advisor, technician); creating logins needs the real backend.
+- [ ] **Re-offer when nobody accepts.** If every offer expires, the booking waits for operations to assign a driver.
+
 ## Done: customer portal (live)
 - [x] Handover code shown to the customer; the driver enters it.
 - [x] Demo pickup dates follow the booking date.
@@ -30,3 +38,12 @@ Items parked for later review. Tick them off as they are done.
 - [x] "Simulate a pickup offer" offers the newest booking.
 - [x] The driver is told when the customer changes the pickup time.
 - [x] Up to 4 vehicle photos at each handover, visible to the customer.
+
+## Done: service center portal
+- [x] Bookings the center creates are offered to online drivers, with the offer status on the booking.
+- [x] All four handovers on the booking, with the driver's vehicle check and photos.
+- [x] The receiving screen shows the driver's pickup check and photos; staff can add up to 4 photos.
+- [x] Late pickups and deliveries are flagged on the dashboard, the bookings list and the booking.
+- [x] Dashboard: today's bookings (total, pending, completed) and workshop (open, completed).
+- [x] Time slots that have already passed today cannot be booked.
+- [x] Staff wording in the activity timeline.

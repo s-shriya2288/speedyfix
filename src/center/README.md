@@ -61,5 +61,10 @@ create policy center_reads_own on work_orders for select using (center_id = (sel
 --   center_request_delivery(p_booking uuid, p_date date, p_slot text, p_address text, p_key text)
 -- Service-role keys stay on the server. Photo storage needs per-center bucket policies.
 ```
-Not built: photo upload (no storage integration), map coordinates, invoicing or payments (labour plus parts are workshop cost records only),
+Dispatch: a pickup booking created by the center is offered to every approved, online driver (same 5-minute offers as customer
+bookings); `bookings.get` returns `dispatch` (open offers and expiry), `late` (a pickup or delivery past its slot) and `handoverSteps`
+(the four handovers in order). Receiving accepts up to 4 photos (`data:image/` URLs in demo; real storage needed). A slot that has already
+ended today is rejected.
+
+Not built: photo storage (photos are kept in the browser in demo), map coordinates, invoicing or payments (labour plus parts are workshop cost records only),
 staff login creation, a separate technician portal.

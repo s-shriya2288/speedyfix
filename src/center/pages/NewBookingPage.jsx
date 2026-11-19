@@ -7,7 +7,7 @@ import { useAsync } from '../../portal/hooks/useAsync';
 import { fmtDate, todayISO } from '../../portal/lib/format';
 import { isPhone, normalizeReg, isRegistration } from '../../portal/lib/validate';
 import { notifyChanged } from '../../portal/lib/events';
-import { ISSUE_TYPES } from '../domain/model';
+import { ISSUE_TYPES, slotPassed } from '../domain/model';
 import { useCenter } from '../layout/CenterContext';
 import DeliveryRequestForm from '../features/DeliveryRequestForm';
 
@@ -26,8 +26,8 @@ function Done({ booking, kind }) {
         {booking.demo && <div className="mt-3"><Badge tone="amber">Demo</Badge></div>}
       </div>
       <div className="space-y-4 px-6 pb-8 pt-4 text-left">
-        <DemoNotice>This is a simulated booking stored in this browser. No real driver has been assigned and no customer has been contacted.</DemoNotice>
-        <p className="text-sm text-slate-300">Status: <strong className="text-white">{kind === 'pickup' ? 'Pending driver assignment' : 'Awaiting a delivery driver'}</strong>. You can follow it from the booking page.</p>
+        <DemoNotice>This is a simulated booking stored in this browser. Offers go to demo drivers in the driver portal; no real driver or customer is contacted.</DemoNotice>
+        <p className="text-sm text-slate-300">Status: <strong className="text-white">{kind === 'pickup' ? 'Waiting for a driver to accept' : 'Waiting for a delivery driver to accept'}</strong>. {booking.dispatch?.liveOffers ? `Offered to ${booking.dispatch.liveOffers} online driver${booking.dispatch.liveOffers === 1 ? '' : 's'}. The first to accept gets the job.` : 'No driver is online right now. Speedy Fix operations will assign one.'} You can follow it from the booking page.</p>
         <div className="flex flex-wrap gap-2"><Button as={Link} to={`/service-center/bookings/${booking.id}`}>View booking</Button><Button as={Link} to="/service-center/bookings/new" variant="secondary">Create another</Button></div>
       </div>
     </Card>
@@ -62,7 +62,7 @@ function PickupForm() {
     customerPhone: !f.customerPhone.trim() ? 'Enter the customer phone number.' : !isPhone(f.customerPhone) ? 'Enter a valid phone number.' : '',
     address: f.address.trim() ? '' : 'Enter the pickup address.', city: f.city.trim() ? '' : 'Enter the city.',
     issueType: f.issueType ? '' : 'Choose a service or issue type.',
-    date: !f.date ? 'Choose a pickup date.' : f.date < todayISO() ? 'Choose today or a later date.' : '', slot: f.slot ? '' : 'Choose a time slot.',
+    date: !f.date ? 'Choose a pickup date.' : f.date < todayISO() ? 'Choose today or a later date.' : '', slot: !f.slot ? 'Choose a time slot.' : slotPassed(f.date, f.slot) ? 'That slot has already passed today. Choose a later one.' : '',
   });
   const toReview = (e) => { e.preventDefault(); const v = validate(); setErrors(v); if (Object.values(v).some(Boolean)) return; setReview(true); };
   const saveDraft = () => { localStorage.setItem(DRAFT, JSON.stringify(f)); setDraft(f); toast.push({ title: 'Draft saved on this device' }); };
@@ -104,7 +104,7 @@ function PickupForm() {
           <div className="grid gap-4 sm:grid-cols-2"><TextField label="City" value={f.city} onChange={set('city')} error={errors.city} required /><TextField label="Postal code (optional)" value={f.postalCode} onChange={set('postalCode')} /></div>
           <TextField label="Landmark (optional)" value={f.landmark} onChange={set('landmark')} hint="Helps the driver find the customer. Map coordinates are not collected in this build." />
           <div className="grid gap-4 sm:grid-cols-2"><TextField label="Preferred pickup date" type="date" min={todayISO()} value={f.date} onChange={set('date')} error={errors.date} required />
-            <SelectField label="Time slot" value={f.slot} onChange={set('slot')} error={errors.slot} required><option value="">Select a slot</option>{SLOTS.map((s) => <option key={s}>{s}</option>)}</SelectField></div>
+            <SelectField label="Time slot" value={f.slot} onChange={set('slot')} error={errors.slot} required><option value="">Select a slot</option>{SLOTS.map((s) => <option key={s} value={s} disabled={slotPassed(f.date, s)}>{s}{slotPassed(f.date, s) ? ' (already passed)' : ''}</option>)}</SelectField></div>
         </fieldset>
         <fieldset className="space-y-4"><legend className="font-display text-sm text-white">Job</legend>
           <div className="grid gap-4 sm:grid-cols-2"><SelectField label="Service or issue type" value={f.issueType} onChange={set('issueType')} error={errors.issueType} required><option value="">Select a type</option>{ISSUE_TYPES.map((t) => <option key={t}>{t}</option>)}</SelectField>

@@ -4,4 +4,5 @@ import { BOOKING_TONE, WO_STATUS, bookingLabel, money as fmt } from '../domain/m
 export const BookingBadge = ({ statusKey }) => <Badge tone={BOOKING_TONE[statusKey] || 'slate'}>{bookingLabel(statusKey)}</Badge>;
 export const WoBadge = ({ status }) => (status ? <Badge tone={WO_STATUS[status]?.tone || 'slate'}>{WO_STATUS[status]?.label || status}</Badge> : <span className="text-slate-400">No work order</span>);
 export const PriorityBadge = ({ priority }) => (priority === 'urgent' ? <Badge tone="rose">Urgent</Badge> : null);
+export const LateBadge = ({ late }) => (late ? <Badge tone="rose" title={late.text}>Late {late.kind}</Badge> : null);
 export const money = fmt;

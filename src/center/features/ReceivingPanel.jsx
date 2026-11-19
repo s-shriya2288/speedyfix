@@ -5,6 +5,8 @@ import { centerServices } from '../services';
 import { fmtDateTime } from '../../portal/lib/format';
 import { notifyChanged } from '../../portal/lib/events';
 import RadioChoice from './RadioChoice';
+import { ConditionRecord } from './HandoverRecords';
+import PhotoPicker from '../../driver/features/PhotoPicker';
 
 const L = { good: 'Good', minor: 'Minor marks', damage: 'Damaged', none: 'None seen', present: 'Present' };
 
@@ -14,7 +16,7 @@ const L = { good: 'Good', minor: 'Minor marks', damage: 'Damaged', none: 'None s
  */
 export default function ReceivingPanel({ booking, onChanged }) {
   const toast = useToast();
-  const [f, setF] = useState({ identityConfirmed: false, exterior: '', scratches: '', fuel: '', accessories: '', notes: '' });
+  const [f, setF] = useState({ identityConfirmed: false, exterior: '', scratches: '', fuel: '', accessories: '', notes: '', photos: [] });
   const [errors, setErrors] = useState({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -31,6 +33,7 @@ export default function ReceivingPanel({ booking, onChanged }) {
             <div><dt className="text-xs text-slate-400">Fuel level</dt><dd className="text-white">{r.fuel || 'Not checked'}</dd></div>
             <div><dt className="text-xs text-slate-400">Items received</dt><dd className="text-white">{r.accessories || 'None noted'}</dd></div>
             {r.notes && <div className="sm:col-span-2"><dt className="text-xs text-slate-400">Notes</dt><dd className="text-white">{r.notes}</dd></div>}
+            {r.photos?.length > 0 && <div className="sm:col-span-2"><dt className="text-xs text-slate-400">Photos</dt><dd className="mt-1 flex flex-wrap gap-2">{r.photos.map((src, i) => <a key={i} href={src} target="_blank" rel="noreferrer"><img src={src} alt={`Receiving photo ${i + 1}`} className="h-16 w-16 rounded-lg border border-white/10 object-cover" /></a>)}</dd></div>}
           </dl>
         </div></Card>
     );
@@ -53,7 +56,8 @@ export default function ReceivingPanel({ booking, onChanged }) {
   return (
     <Card className="border-amber-400/30"><CardHeader title="Receive this vehicle" action={<Badge tone="amber">Action needed</Badge>} />
       <form onSubmit={submit} noValidate className="space-y-5 px-5 py-5">
-        <p className="text-sm text-slate-300">The driver has arrived{booking.handovers.pickup.driverCondition ? ` and recorded the condition at pickup (exterior: ${L[booking.handovers.pickup.driverCondition.exterior]}).` : '.'} Check the vehicle, then confirm receipt.</p>
+        <p className="text-sm text-slate-300">The driver has {booking.driverHandedOverAt ? 'handed the vehicle over' : 'arrived'}. Check the vehicle against what the driver recorded at pickup, then confirm receipt.</p>
+        {booking.handovers.pickup.driverCondition ? <ConditionRecord r={booking.handovers.pickup.driverCondition} label={`Driver's check at pickup${booking.driver?.name ? ` (${booking.driver.name})` : ''}`} /> : <p className="text-xs text-slate-400">The driver did not record the condition at pickup.</p>}
         {error && <InlineAlert>{error}</InlineAlert>}
         <div><label className={cx('flex min-h-[44px] cursor-pointer items-center gap-3 rounded-xl border px-3.5 text-sm', f.identityConfirmed ? 'border-volt-glow bg-volt/10 text-white' : 'border-white/10 text-slate-300')}>
           <input type="checkbox" checked={f.identityConfirmed} onChange={(e) => setF({ ...f, identityConfirmed: e.target.checked })} className="h-4 w-4 accent-[#1F6BFF]" />
@@ -66,7 +70,7 @@ export default function ReceivingPanel({ booking, onChanged }) {
           <TextField label={<span className="flex items-center gap-2">Items received <Badge>Optional</Badge></span>} value={f.accessories} onChange={(e) => setF({ ...f, accessories: e.target.value })} placeholder="Spare key, documents" />
         </div>
         <TextAreaField label={<span className="flex items-center gap-2">Notes {damaged ? <Badge tone="rose">Required</Badge> : <Badge>Optional</Badge>}</span>} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} error={errors.notes} />
-        <p className="rounded-xl border border-white/10 bg-white/[.03] px-3.5 py-2.5 text-xs text-slate-400">Photo upload is not connected to storage in this build.</p>
+        <PhotoPicker photos={f.photos} onChange={(photos) => setF((x) => ({ ...x, photos }))} hint="Photograph anything that differs from the driver's record. Kept on the booking in this demo." />
         <Button type="submit" size="lg" className="w-full" loading={busy}>Confirm vehicle received</Button>
       </form>
     </Card>

@@ -6,7 +6,7 @@ import { useAsync, usePolling } from '../../portal/hooks/useAsync';
 import { PageHeader, Badge, Button, Card, CardHeader, DemoNotice, EmptyState, ErrorState, Skeleton, useToast } from '../../portal/ui';
 import { relativeTime } from '../../portal/lib/format';
 import { useCenter } from '../layout/CenterContext';
-import { BookingBadge, WoBadge } from '../features/badges';
+import { BookingBadge, LateBadge, WoBadge } from '../features/badges';
 import { notifyChanged } from '../../portal/lib/events';
 
 const Stat = ({ label, value, tone = 'text-white' }) => <Card className="p-4"><p className="text-sm text-slate-400">{label}</p><p className={`mt-2 font-display text-3xl tabular-nums ${tone}`}>{value}</p></Card>;
@@ -46,14 +46,24 @@ export default function DashboardPage() {
 
       {d && d.totalBookings > 0 && (
         <>
+          <div className="grid gap-3 lg:grid-cols-2">
+            <Card className="p-5">
+              <div className="flex items-center justify-between gap-3"><h2 className="font-display text-base text-white">Today's bookings</h2><span className="text-xs text-slate-400">Pickups and drops scheduled today</span></div>
+              <div className="mt-3 grid grid-cols-3 gap-3 text-center">
+                {[['Total', d.today.total, 'text-white'], ['Pending', d.today.pending, 'text-amber-300'], ['Completed', d.today.completed, 'text-emerald-300']].map(([l, v, tone]) => <div key={l} className="rounded-xl bg-white/[.03] py-3"><p className={`font-display text-3xl tabular-nums ${tone}`}>{v}</p><p className="text-xs text-slate-400">{l}</p></div>)}
+              </div>
+            </Card>
+            <Card className="p-5">
+              <div className="flex items-center justify-between gap-3"><h2 className="font-display text-base text-white">Workshop</h2>{can('wo.progress') && <Link to="/service-center/work-orders" className="text-xs text-volt-glow hover:underline">Work orders</Link>}</div>
+              <div className="mt-3 grid grid-cols-2 gap-3 text-center">
+                {[['Open work orders', d.counts.openWorkOrders, 'text-volt-glow'], ['Completed', d.counts.completedServices, 'text-emerald-300']].map(([l, v, tone]) => <div key={l} className="rounded-xl bg-white/[.03] py-3"><p className={`font-display text-3xl tabular-nums ${tone}`}>{v}</p><p className="text-xs text-slate-400">{l}</p></div>)}
+              </div>
+            </Card>
+          </div>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <Stat label="Bookings today" value={d.counts.bookingsToday} />
             <Stat label="Pending pickups" value={d.counts.pendingPickup} />
             <Stat label="Vehicles on the way" value={d.counts.awaitingArrival} />
             <Stat label="Awaiting delivery" value={d.counts.awaitingDelivery} />
-            <Stat label="Open work orders" value={d.counts.openWorkOrders} />
-            <Stat label="In progress" value={d.counts.inProgress} tone="text-volt-glow" />
-            <Stat label="Completed services" value={d.counts.completedServices} tone="text-emerald-300" />
             <Stat label="Vehicles in workshop" value={d.workshop.vehicles.length} />
           </div>
 
@@ -61,7 +71,7 @@ export default function DashboardPage() {
             <CardHeader title={`Needs your attention (${d.attention.length})`} />
             <ul className="divide-y divide-white/10">
               {d.attention.map((a) => (
-                <li key={a.id}><Link to={a.workOrderId && a.kind !== 'delivery' ? `/service-center/work-orders/${a.workOrderId}` : `/service-center/bookings/${a.bookingId}`} className="flex items-center gap-3 px-5 py-3 hover:bg-white/5"><AlertCircle className="h-4 w-4 shrink-0 text-amber-300" aria-hidden="true" /><span className="flex-1 text-sm text-slate-100">{a.text}</span><ArrowRight className="h-4 w-4 text-slate-400" aria-hidden="true" /></Link></li>
+                <li key={a.id}><Link to={a.workOrderId && a.kind !== 'delivery' ? `/service-center/work-orders/${a.workOrderId}` : `/service-center/bookings/${a.bookingId}`} className="flex items-center gap-3 px-5 py-3 hover:bg-white/5"><AlertCircle className={`h-4 w-4 shrink-0 ${a.kind === 'late' ? 'text-rose-300' : 'text-amber-300'}`} aria-hidden="true" /><span className="flex-1 text-sm text-slate-100">{a.text}</span><ArrowRight className="h-4 w-4 text-slate-400" aria-hidden="true" /></Link></li>
               ))}
               {!d.attention.length && <li className="px-5 py-6 text-center text-sm text-slate-400">Nothing needs attention right now.</li>}
             </ul>
@@ -79,7 +89,7 @@ export default function DashboardPage() {
 
           <Card>
             <CardHeader title="Recent bookings" action={<Link to="/service-center/bookings" className="text-sm text-volt-glow hover:underline">All bookings</Link>} />
-            <ul className="divide-y divide-white/10">{d.recent.map((b) => <li key={b.id}><Link to={`/service-center/bookings/${b.id}`} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-3 hover:bg-white/5"><span className="text-sm font-semibold text-white">{b.reference}</span><span className="text-sm text-slate-300">{b.vehicle.registration} · {b.customer.name}</span><BookingBadge statusKey={b.statusKey} />{b.demo && <Badge tone="amber">Demo</Badge>}<span className="ml-auto text-xs text-slate-400">{relativeTime(b.updatedAt)}</span></Link></li>)}</ul>
+            <ul className="divide-y divide-white/10">{d.recent.map((b) => <li key={b.id}><Link to={`/service-center/bookings/${b.id}`} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-3 hover:bg-white/5"><span className="text-sm font-semibold text-white">{b.reference}</span><span className="text-sm text-slate-300">{b.vehicle.registration} · {b.customer.name}</span><BookingBadge statusKey={b.statusKey} /><LateBadge late={b.late} />{b.demo && <Badge tone="amber">Demo</Badge>}<span className="ml-auto text-xs text-slate-400">{relativeTime(b.updatedAt)}</span></Link></li>)}</ul>
           </Card>
           {d.recent.some((b) => b.demo) && <DemoNotice>Some records on this dashboard are demonstration data.</DemoNotice>}
         </>

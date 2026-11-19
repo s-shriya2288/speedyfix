@@ -7,7 +7,7 @@ import { fmtDate, relativeTime } from '../../portal/lib/format';
 import { BOOKING_FILTERS } from '../domain/model';
 import { useCenter } from '../layout/CenterContext';
 import ResponsiveTable from '../features/ResponsiveTable';
-import { BookingBadge, PriorityBadge, WoBadge } from '../features/badges';
+import { BookingBadge, LateBadge, PriorityBadge, WoBadge } from '../features/badges';
 
 export default function BookingsPage() {
   const { can } = useCenter();
@@ -34,7 +34,7 @@ export default function BookingsPage() {
     { key: 'type', header: 'Type', render: (b) => (b.delivery ? 'Pickup + drop' : 'Pickup') },
     { key: 'sched', header: 'Schedule', render: (b) => `${fmtDate(b.schedule.date)}, ${b.schedule.slot}` },
     { key: 'drv', header: 'Driver', render: (b) => b.driver?.name || <span className="text-slate-400">Not assigned</span> },
-    { key: 'st', header: 'Status', render: (b) => <span className="flex flex-col items-start gap-1"><BookingBadge statusKey={b.statusKey} />{b.workOrder && <WoBadge status={b.workOrder.status} />}</span> },
+    { key: 'st', header: 'Status', render: (b) => <span className="flex flex-col items-start gap-1"><BookingBadge statusKey={b.statusKey} /><LateBadge late={b.late} />{b.workOrder && <WoBadge status={b.workOrder.status} />}</span> },
     { key: 'upd', header: 'Updated', render: (b) => relativeTime(b.updatedAt) },
   ];
   const filtered = status !== 'all' || query;

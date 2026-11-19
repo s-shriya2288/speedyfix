@@ -29,7 +29,7 @@ const need = (u, perm) => { if (!can(u, perm)) throw new E('FORBIDDEN', 'Your ro
 const ckey = (id) => `center:${id}`;
 const cstate = (id) => read(ckey(id), { settings: { contact: '', hours: '', hourlyRate: null }, technicians: [], seen: {} });
 const centerInfo = (id) => X.allCenters().find((c) => c.id === id) || { id, name: id, address: '' };
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 const r2 = (n) => Math.round(n * 100) / 100;
 const normReg = (v) => String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 
@@ -120,6 +120,20 @@ function woView(me, cs, e) {
   };
 }
 
+// ---------- late jobs: a pickup or delivery still not done after its time slot ends ----------
+const slotEnd = (date, slot) => { const m = /-\s*(\d{1,2}):(\d{2})/.exec(slot || ''); if (!date || !m) return null; const t = new Date(`${date}T00:00:00`); t.setHours(Number(m[1]), Number(m[2]), 0, 0); return t; };
+function lateness(b) {
+  const now = Date.now();
+  const pickupOpen = ['confirmed', 'driver_assigned', 'driver_en_route'].includes(b.status);
+  const deliveryOpen = b.delivery && ['service_completed', 'delivery_driver_assigned', 'out_for_delivery'].includes(b.status);
+  const end = pickupOpen ? slotEnd(b.pickup?.date, b.pickup?.slot) : deliveryOpen ? slotEnd(b.delivery.date, b.delivery.slot) : null;
+  if (!end || now <= end.getTime()) return null;
+  return { kind: pickupOpen ? 'pickup' : 'delivery', since: end.toISOString(), minutes: Math.round((now - end.getTime()) / 60000) };
+}
+/** A slot is bookable if its date is today or later and, for today, it has not already ended. */
+const slotOpen = (date, slot) => Boolean(date) && date >= today() && X.SLOTS.includes(slot) && (date > today() || (slotEnd(date, slot)?.getTime() ?? 0) > Date.now());
+const lateText = (l) => { const h = Math.floor(l.minutes / 60); return `${l.kind === 'pickup' ? 'Pickup' : 'Delivery'} is ${h >= 24 ? `${Math.floor(h / 24)} day${h >= 48 ? 's' : ''}` : h ? `${h} h ${l.minutes % 60} min` : `${l.minutes} min`} past its time slot`; };
+
 // ---------- booking views ----------
 function bookingSummary(me, cs, e) {
   const { b } = e;
@@ -132,12 +146,19 @@ function bookingSummary(me, cs, e) {
     driver: b.driver ? { name: b.driver.name } : null, status: b.status, statusKey: statusKey(b),
     workOrder: wo ? { id: wo.id, reference: wo.reference, status: wo.status, technician: cs.technicians.find((t) => t.id === wo.technicianId)?.name || null } : null,
     updatedAt: b.updatedAt, createdAt: b.createdAt, createdBy: b.createdBy?.type || 'customer', demo: Boolean(b.demo),
+    late: (() => { const l = lateness(b); return l ? { ...l, text: lateText(l) } : null; })(),
   };
 }
+// Staff-facing wording (the customer portal has its own).
+const STATUS_LABEL = {
+  confirmed: 'Booking created', driver_assigned: 'Driver assigned', driver_en_route: 'Driver on the way to the customer', picked_up: 'Vehicle picked up from the customer',
+  in_transit: 'Vehicle on the way to your center', received_at_center: 'Vehicle received at your center', service_in_progress: 'Service started', service_completed: 'Service completed',
+  delivery_driver_assigned: 'Delivery driver assigned', out_for_delivery: 'Delivery driver collected the vehicle and set off', delivered: 'Delivered to the customer', cancelled: 'Booking cancelled',
+};
 function timeline(b) {
   const out = [];
-  (b.statusHistory || []).forEach((h) => out.push({ at: h.at, kind: 'booking', label: X.NOTE[h.status] || h.status }));
-  (b.jobLog || []).filter((l) => ['arrived', 'inspected', 'verified', 'center_arrived', 'handed_over', 'started'].includes(l.event)).forEach((l) => out.push({ at: l.at, kind: 'driver', label: ({ arrived: 'Driver arrived', inspected: 'Driver recorded vehicle condition', verified: 'Handover verified with OTP', center_arrived: 'Driver arrived at the service center', handed_over: 'Driver handed the vehicle to the center', started: 'Driver started a journey' })[l.event] }));
+  (b.statusHistory || []).forEach((h) => out.push({ at: h.at, kind: 'booking', label: STATUS_LABEL[h.status] || X.NOTE[h.status] || h.status }));
+  (b.jobLog || []).filter((l) => ['arrived', 'inspected', 'verified', 'center_arrived', 'handed_over'].includes(l.event)).forEach((l) => out.push({ at: l.at, kind: 'driver', label: ({ arrived: 'Driver arrived', inspected: 'Driver recorded vehicle condition', verified: 'Handover verified with OTP', center_arrived: 'Driver arrived at the service center', handed_over: 'Driver handed the vehicle to the center', started: 'Driver started a journey' })[l.event] }));
   if (b.receiving) out.push({ at: b.receiving.at, kind: 'center', label: `Receipt confirmed by ${b.receiving.byName}` });
   (b.workOrder?.history || []).forEach((h) => out.push({ at: h.at, kind: 'workorder', label: `Work order ${h.status.replace(/_/g, ' ')}${h.note ? `: ${h.note}` : ''}` }));
   if (b.delivery) out.push({ at: b.delivery.requestedAt || b.updatedAt, kind: 'center', label: `Delivery requested for ${b.delivery.date}, ${b.delivery.slot}` });
@@ -156,6 +177,14 @@ function bookingDetail(me, cs, e) {
       pickup: { status: hv('pickup').status, verifiedAt: b.handovers.pickup.verifiedAt, driverCondition: j.inspection || null },
       delivery: { status: hv('delivery').status, verifiedAt: b.handovers.delivery.verifiedAt, driverCondition: dj.inspection || null },
     },
+    // The four handovers of a round trip, in order (see the partner briefing).
+    handoverSteps: [
+      { key: 'pickup', title: 'Pickup from the customer', parties: 'Customer to driver', at: b.handovers.pickup.verifiedAt, method: 'Verified with the customer\'s OTP', by: b.driver?.name, condition: j.inspection || null },
+      { key: 'center_in', title: 'Handover at your center', parties: 'Driver to your team', at: b.receiving?.at || null, method: b.receiving ? `Receipt confirmed by ${b.receiving.byName}` : j.handedOverAt ? 'Driver has handed over. Confirm receipt under Receiving.' : j.centerArrivedAt ? 'Driver has arrived. Confirm receipt under Receiving.' : '', by: b.driver?.name, condition: b.receiving || null },
+      { key: 'center_out', title: 'Pickup from your center', parties: 'Your team to the delivery driver', at: dj.startedAt || null, method: dj.startedAt ? 'Delivery driver collected the vehicle and set off' : '', by: b.deliveryDriver?.name, condition: null },
+      { key: 'delivery', title: 'Delivery to the customer', parties: 'Driver to customer', at: b.handovers.delivery.verifiedAt, method: 'Verified with the customer\'s OTP', by: b.deliveryDriver?.name, condition: dj.inspection || null },
+    ],
+    dispatch: dispatchView(b),
     driverArrivedAt: j.centerArrivedAt || null, driverHandedOverAt: j.handedOverAt || null,
     receiving: b.receiving || null, receivable: receivable(b),
     timeline: timeline(b), audit: can(me, 'settings.manage') ? (b.audit || []).slice().reverse() : [],
@@ -165,9 +194,16 @@ function bookingDetail(me, cs, e) {
       receive: receivable(b) && can(me, 'receive'), requestDelivery: deliveryEligible(b) && can(me, 'delivery.request'),
     },
     deliveryDefaults: { address: [b.pickup.address, b.pickup.city, b.pickup.postalCode].filter(Boolean).join(', ') },
-    photos: [], // No storage integration exists in this build.
   };
 }
+/** Who has been offered the open job (pickup before a driver accepts, delivery before a delivery driver accepts). */
+function dispatchView(b) {
+  const type = b.status === 'confirmed' && !b.driver ? 'pickup' : b.status === 'service_completed' && b.delivery && !b.deliveryDriver ? 'delivery' : null;
+  if (!type) return null;
+  const live = (b.offers || []).filter((o) => o.job === type && X.offerLive(o));
+  return { type, liveOffers: live.length, expiresAt: live.length ? new Date(Math.max(...live.map((o) => new Date(o.at).getTime())) + X.OFFER_TTL_MS).toISOString() : null };
+}
+const AT_CENTER_OR_LATER = ['received_at_center', 'service_in_progress', 'service_completed', 'delivery_driver_assigned', 'out_for_delivery', 'delivered'];
 const receivable = (b) => b.status === 'in_transit' && Boolean(b.pickupJob?.centerArrivedAt || b.pickupJob?.handedOverAt) && !b.receiving;
 const deliveryEligible = (b) => b.status === 'service_completed' && b.workOrder?.status === 'completed' && !b.delivery;
 
@@ -178,7 +214,9 @@ function validateReceiving(c = {}) {
   if (!['none', 'present'].includes(c.scratches)) miss.push('scratches or dents');
   if (miss.length) throw new E('INVALID_INPUT', `Complete the required checks: ${miss.join(', ')}.`);
   if ((c.scratches === 'present' || c.exterior === 'damage') && !String(c.notes || '').trim()) throw new E('INVALID_INPUT', 'Describe the visible damage in the notes.');
-  return { identityConfirmed: true, exterior: c.exterior, scratches: c.scratches, fuel: c.fuel || '', accessories: String(c.accessories || '').trim(), notes: String(c.notes || '').trim() };
+  const photos = Array.isArray(c.photos) ? c.photos : [];
+  if (photos.length > 4 || photos.some((p) => typeof p !== 'string' || !p.startsWith('data:image/') || p.length > 600000)) throw new E('INVALID_INPUT', 'Attach up to 4 photos.');
+  return { identityConfirmed: true, exterior: c.exterior, scratches: c.scratches, fuel: c.fuel || '', accessories: String(c.accessories || '').trim(), notes: String(c.notes || '').trim(), photos };
 }
 
 export const demoCenterAdapter = {
@@ -209,6 +247,8 @@ export const demoCenterAdapter = {
       const attention = [];
       es.forEach((e) => {
         const b = e.b; const wo = b.workOrder;
+        const late = lateness(b);
+        if (late) attention.push({ id: `a_late_${b.id}`, bookingId: b.id, kind: 'late', text: `${b.vehicle.registration}: ${lateText(late).toLowerCase()}. Call the ${late.kind === 'pickup' ? (b.driver ? 'driver' : 'customer') : (b.deliveryDriver ? 'driver' : 'customer')}.`, priority: 0 });
         if (receivable(b)) attention.push({ id: `a_arr_${b.id}`, bookingId: b.id, kind: 'receive', text: `${b.vehicle.registration} has arrived. Receive the vehicle.`, priority: 1 });
         if (wo?.status === 'new') attention.push({ id: `a_new_${b.id}`, bookingId: b.id, workOrderId: wo.id, kind: 'accept', text: `${wo.reference} needs to be accepted.`, priority: 2 });
         if (wo?.status === 'accepted') attention.push({ id: `a_asg_${b.id}`, bookingId: b.id, workOrderId: wo.id, kind: 'assign', text: `${wo.reference} needs a technician.`, priority: 2 });
@@ -218,7 +258,15 @@ export const demoCenterAdapter = {
         if (b.status === 'service_completed' && b.delivery && !b.deliveryDriver) attention.push({ id: `a_drv_${b.id}`, bookingId: b.id, kind: 'driver', text: `Delivery for ${b.vehicle.registration} is waiting for a driver.`, priority: 3 });
       });
       const ws = (s) => workshop.filter((w) => w.status === s);
+      // Today's trips: pickups and drops scheduled for today. A pickup is done once the vehicle is with the center; a drop once delivered.
+      const trips = [];
+      es.forEach(({ b }) => {
+        if (b.status === 'cancelled') return;
+        if (b.pickup?.date === t) trips.push(Boolean(b.pickupJob?.handedOverAt || AT_CENTER_OR_LATER.includes(b.status)));
+        if (b.delivery?.date === t) trips.push(b.status === 'delivered');
+      });
       return {
+        today: { total: trips.length, completed: trips.filter(Boolean).length, pending: trips.filter((x) => !x).length },
         counts: {
           bookingsToday: sums.filter((s) => s.schedule.date === t || (s.createdAt || '').slice(0, 10) === t).length,
           pendingPickup: sums.filter((s) => ['pending', 'driver_assigned'].includes(s.statusKey) || ['driver_en_route'].includes(s.status)).length,
@@ -282,7 +330,7 @@ export const demoCenterAdapter = {
       if (!p.address?.trim() || !p.city?.trim()) throw new E('INVALID_INPUT', 'Enter the pickup address and city.');
       if (!p.issueType) throw new E('INVALID_INPUT', 'Choose a service or issue type.');
       if (!['normal', 'urgent'].includes(p.priority)) throw new E('INVALID_INPUT', 'Choose a priority.');
-      if (!p.date || p.date < today() || !X.SLOTS.includes(p.slot)) throw new E('INVALID_INPUT', 'Choose a pickup date (today or later) and a time slot.');
+      if (!slotOpen(p.date, p.slot)) throw new E('INVALID_INPUT', 'Choose a pickup date and a time slot that has not already passed.');
       // The same vehicle cannot have two open bookings at this center.
       if (entries(me).some((e) => normReg(e.b.vehicle.registration) === reg && !['delivered', 'cancelled'].includes(e.b.status))) throw new E('DUPLICATE_OPEN_BOOKING', `${p.registration.toUpperCase()} already has an open booking at this center.`);
       const prior = entries(me).find((e) => normReg(e.b.vehicle.registration) === reg);
@@ -297,6 +345,9 @@ export const demoCenterAdapter = {
         handovers: { pickup: { verifiedAt: null }, delivery: { verifiedAt: null } }, createdBy: { type: 'center', id: me.id },
       };
       audit(b, me, 'booking.created', b.reference);
+      // Same dispatch as customer bookings: every approved driver who is online gets the offer.
+      const sent = X.dispatchOffers(b, 'pickup');
+      audit(b, me, 'booking.dispatched', sent ? `Offered to ${sent} online driver${sent === 1 ? '' : 's'}` : 'No driver online');
       w.d.bookings.push(b);
       if (idempotencyKey) w.d.idem[idempotencyKey] = b.id;
       write(w.key, w.d);
@@ -308,7 +359,7 @@ export const demoCenterAdapter = {
       need(me, 'bookings.manage');
       const e = findOne(me, id);
       if (!['confirmed', 'driver_assigned'].includes(e.b.status)) throw new E('NOT_ALLOWED', 'This booking can no longer be changed because the pickup has started.');
-      if (patch.date !== undefined && (patch.date < today() || !X.SLOTS.includes(patch.slot))) throw new E('INVALID_INPUT', 'Choose a pickup date (today or later) and a time slot.');
+      if (patch.date !== undefined && (patch.date !== e.b.pickup.date || patch.slot !== e.b.pickup.slot) && !slotOpen(patch.date, patch.slot)) throw new E('INVALID_INPUT', 'Choose a pickup date and a time slot that has not already passed.');
       if (patch.date) { e.b.pickup.date = patch.date; e.b.pickup.slot = patch.slot; }
       if (patch.landmark !== undefined) e.b.pickup.landmark = String(patch.landmark).trim();
       if (patch.instructions !== undefined) e.b.pickup.instructions = String(patch.instructions).trim();
@@ -507,7 +558,7 @@ export const demoCenterAdapter = {
       if (e.b.delivery && idempotencyKey && e.b.delivery.key === idempotencyKey) return bookingDetail(me, cstate(me.centerId), e);
       if (e.b.delivery) throw new E('ALREADY_REQUESTED', 'Delivery has already been requested for this booking.');
       if (!deliveryEligible(e.b)) throw new E('NOT_ELIGIBLE', 'Delivery can only be requested after the work order is completed and the quality check has passed.');
-      if (!date || date < today() || !X.SLOTS.includes(slot)) throw new E('INVALID_INPUT', 'Choose a delivery date (today or later) and a time slot.');
+      if (!slotOpen(date, slot)) throw new E('INVALID_INPUT', 'Choose a delivery date and a time slot that has not already passed.');
       if (!String(address || '').trim()) throw new E('INVALID_INPUT', 'Enter the delivery address.');
       e.b.delivery = { date, slot, address: address.trim(), notes: String(notes || '').trim(), requestedBy: 'center', requestedAt: nowISO(), key: idempotencyKey || null };
       e.b.updatedAt = nowISO();

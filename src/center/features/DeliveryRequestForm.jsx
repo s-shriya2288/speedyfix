@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { slotPassed } from '../domain/model';
 import { Button, InlineAlert, SelectField, TextAreaField, TextField, useToast } from '../../portal/ui';
 import { centerServices } from '../services';
 import { todayISO } from '../../portal/lib/format';
@@ -18,7 +19,7 @@ export default function DeliveryRequestForm({ booking, defaults, onDone, onCance
   const submit = async (e) => {
     e?.preventDefault();
     if (busyRef.current) return;
-    const next = { date: !f.date ? 'Choose a delivery date.' : f.date < todayISO() ? 'Choose today or a later date.' : '', slot: f.slot ? '' : 'Choose a time slot.', address: f.address.trim() ? '' : 'Enter the delivery address.' };
+    const next = { date: !f.date ? 'Choose a delivery date.' : f.date < todayISO() ? 'Choose today or a later date.' : '', slot: !f.slot ? 'Choose a time slot.' : slotPassed(f.date, f.slot) ? 'That slot has already passed today. Choose a later one.' : '', address: f.address.trim() ? '' : 'Enter the delivery address.' };
     setErr(next);
     if (Object.values(next).some(Boolean)) return;
     busyRef.current = true; setBusy(true); setError('');
@@ -32,7 +33,7 @@ export default function DeliveryRequestForm({ booking, defaults, onDone, onCance
       <TextField label="Delivery address" value={f.address} onChange={(e) => setF({ ...f, address: e.target.value })} error={err.address} hint="Taken from the customer's booking record." required />
       <div className="grid gap-4 sm:grid-cols-2">
         <TextField label="Preferred delivery date" type="date" min={todayISO()} value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} error={err.date} required />
-        <SelectField label="Time slot" value={f.slot} onChange={(e) => setF({ ...f, slot: e.target.value })} error={err.slot} required><option value="">Select a slot</option>{SLOTS.map((s) => <option key={s}>{s}</option>)}</SelectField>
+        <SelectField label="Time slot" value={f.slot} onChange={(e) => setF({ ...f, slot: e.target.value })} error={err.slot} required><option value="">Select a slot</option>{SLOTS.map((s) => <option key={s} value={s} disabled={slotPassed(f.date, s)}>{s}{slotPassed(f.date, s) ? ' (already passed)' : ''}</option>)}</SelectField>
       </div>
       <TextAreaField label="Instructions (optional)" value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} />
       <div className="flex flex-wrap justify-end gap-2">{onCancel && <Button variant="secondary" onClick={onCancel} disabled={busy}>Cancel</Button>}<Button type="submit" loading={busy}>Request delivery</Button></div>

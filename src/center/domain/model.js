@@ -61,3 +61,12 @@ export const ISSUE_TYPES = ['General servicing', 'Repair and maintenance', 'Insp
 export const ROLE_LABEL = { manager: 'Center manager', advisor: 'Service advisor', technician: 'Technician' };
 
 export const money = (n, currency = 'INR') => new Intl.NumberFormat('en-IN', { style: 'currency', currency, maximumFractionDigits: 2 }).format(n || 0);
+
+/** True when the slot (e.g. "09:00 - 12:00") on that date has already ended. The server checks this too. */
+export function slotPassed(date, slot) {
+  const m = /-\s*(\d{1,2}):(\d{2})/.exec(slot || '');
+  if (!date || !m) return false;
+  const end = new Date(`${date}T00:00:00`);
+  end.setHours(Number(m[1]), Number(m[2]), 0, 0);
+  return end.getTime() <= Date.now();
+}
