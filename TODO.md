@@ -23,7 +23,12 @@ Items parked for later review. Tick them off as they are done.
 - [ ] **Staff confirm handing the car to the delivery driver.** Currently recorded when the driver sets off.
 - [ ] **Works offline** (save work-order updates on the phone, sync later) and **PIN lock**. Both need the real app build.
 - [ ] **A login for each staff member.** Roles exist (manager, advisor, technician); creating logins needs the real backend.
-- [ ] **Re-offer when nobody accepts.** If every offer expires, the booking waits for operations to assign a driver.
+- [ ] **Automatic re-offer when nobody accepts.** Operations can now press "Offer to all online drivers"; doing it automatically needs a backend timer.
+
+## Admin portal
+- [ ] **Live map of drivers.** Needs GPS from the driver app and a maps provider.
+- [ ] **SMS, email and push alerts for operations.** Only in-app alerts exist; needs a messaging provider.
+- [ ] **Driver pay and center billing reports.** Needs the per-trip rate and the commercial terms.
 
 ## Done: customer portal (live)
 - [x] Handover code shown to the customer; the driver enters it.
@@ -47,3 +52,11 @@ Items parked for later review. Tick them off as they are done.
 - [x] Dashboard: today's bookings (total, pending, completed) and workshop (open, completed).
 - [x] Time slots that have already passed today cannot be booked.
 - [x] Staff wording in the activity timeline.
+
+## Done: admin portal
+- [x] Drivers are told when operations assigns, offers, reassigns, reschedules or cancels a job.
+- [x] Drivers are also told when the customer or the service center cancels or moves a pickup; open offers are withdrawn.
+- [x] "Offer to all online drivers" for jobs nobody has accepted, on Assignments and on the booking.
+- [x] Booking page shows all four handovers with the vehicle checks and photos.
+- [x] Staff wording in the booking timeline and the dashboard's recent activity (with the driver's name).
+- [x] A pickup cannot be corrected to a past date.

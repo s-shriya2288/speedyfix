@@ -18,7 +18,7 @@ export function ConditionRecord({ r, label = 'Vehicle condition' }) {
 }
 
 /** The four handovers of a round trip: customer to driver, driver to center, center to driver, driver to customer. */
-export default function HandoverRecords({ steps }) {
+export default function HandoverRecords({ steps, footer = 'Customer handovers are completed by drivers with the customer\'s one-time code; your team cannot verify or override them.' }) {
   return (
     <Card><CardHeader title="Handover records" />
       <ol className="divide-y divide-white/10">
@@ -31,12 +31,12 @@ export default function HandoverRecords({ steps }) {
                 {s.at ? <Badge tone="green">{fmtDateTime(s.at)}</Badge> : <Badge>Not yet</Badge>}
               </div>
               {(s.method && (s.at || s.key === 'center_in')) && <p className="mt-1 text-xs text-slate-400">{s.method}{s.by && s.key !== 'center_in' ? ` · ${s.by}` : ''}</p>}
-              <ConditionRecord r={s.condition} label={s.key === 'center_in' ? 'Your receiving checklist' : 'Driver\'s vehicle check'} />
+              <ConditionRecord r={s.condition} label={s.conditionLabel || (s.key === 'center_in' ? 'Your receiving checklist' : 'Driver\'s vehicle check')} />
             </div>
           </li>
         ))}
       </ol>
-      <p className="border-t border-white/10 px-5 py-3 text-xs text-slate-400">Customer handovers are completed by drivers with the customer's one-time code; your team cannot verify or override them.</p>
+      <p className="border-t border-white/10 px-5 py-3 text-xs text-slate-400">{footer}</p>
     </Card>
   );
 }

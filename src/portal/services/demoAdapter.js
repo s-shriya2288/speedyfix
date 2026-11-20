@@ -75,6 +75,16 @@ function notifyDriver(driverId, n) {
   s.notifications.unshift({ id: `n_${rid()}`, createdAt: nowISO(), read: false, ...n });
   write(k, s);
 }
+/** Tells the pickup driver (and drivers holding an open offer) that a booking was cancelled; open offers are withdrawn. */
+function tellDriversCancelled(b, by) {
+  const jid = `${b.id}~pickup`;
+  if (b.driver) notifyDriver(b.driver.id, { jobId: jid, reference: b.reference, type: 'cancelled', message: `${b.reference} was cancelled by ${by}. You no longer need to do this pickup.` });
+  (b.offers || []).filter((o) => o.job === 'pickup' && offerLive(o) && o.driverId !== b.driver?.id).forEach((o) => { o.status = 'withdrawn'; notifyDriver(o.driverId, { jobId: jid, reference: b.reference, type: 'cancelled', message: `The offer for ${b.reference} was withdrawn: the booking was cancelled.` }); });
+}
+/** Tells the assigned pickup driver about a new pickup time. */
+function tellDriverRescheduled(b, by) {
+  if (b.driver) notifyDriver(b.driver.id, { jobId: `${b.id}~pickup`, reference: b.reference, type: 'rescheduled', message: `${b.reference}: ${by} moved the pickup to ${b.pickup.date}, ${b.pickup.slot}.` });
+}
 /**
  * Offers a job leg to every approved driver who is online, as operations would when a booking comes in. The first
  * driver to accept gets it (enforced in the driver adapter). Returns how many drivers were offered the job.
@@ -390,6 +400,7 @@ export const demoAdapter = {
       const b = find(c.d, id);
       if (!['confirmed', 'driver_assigned'].includes(b.status)) throw new E('NOT_CANCELLABLE', 'This booking can no longer be cancelled because the pickup has already started.');
       setStatus(c.d, b, 'cancelled');
+      tellDriversCancelled(b, 'the customer');
       c.save();
       return view(c.d, b);
     },
@@ -538,4 +549,4 @@ export const demoAdapter = {
 };
 
 /** Used by the demo driver adapter so both portals read and write the same simulated booking records. */
-export const demoInternals = { OFFER_TTL_MS, offerLive, notifyDriver, dispatchOffers, keepSession, seedWorld, clearWorld, CENTERS, allCenters, centerAvailable, NOTE, NS, read, write, delay, rid, nowISO, issueOtp, setStatus, addNote, consumeOtp, handoverView, SLOTS, sessionUser, publicUser };
+export const demoInternals = { OFFER_TTL_MS, offerLive, notifyDriver, tellDriversCancelled, tellDriverRescheduled, dispatchOffers, keepSession, seedWorld, clearWorld, CENTERS, allCenters, centerAvailable, NOTE, NS, read, write, delay, rid, nowISO, issueOtp, setStatus, addNote, consumeOtp, handoverView, SLOTS, sessionUser, publicUser };

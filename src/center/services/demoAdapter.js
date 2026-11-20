@@ -8,6 +8,7 @@
  */
 import { ServiceError as E } from '../../portal/services/errors';
 import { demoInternals as X } from '../../portal/services/demoAdapter';
+import { STAFF_STATUS_LABEL } from '../../portal/domain/status';
 
 const { NS, read, write, delay, rid, nowISO } = X;
 
@@ -149,15 +150,9 @@ function bookingSummary(me, cs, e) {
     late: (() => { const l = lateness(b); return l ? { ...l, text: lateText(l) } : null; })(),
   };
 }
-// Staff-facing wording (the customer portal has its own).
-const STATUS_LABEL = {
-  confirmed: 'Booking created', driver_assigned: 'Driver assigned', driver_en_route: 'Driver on the way to the customer', picked_up: 'Vehicle picked up from the customer',
-  in_transit: 'Vehicle on the way to your center', received_at_center: 'Vehicle received at your center', service_in_progress: 'Service started', service_completed: 'Service completed',
-  delivery_driver_assigned: 'Delivery driver assigned', out_for_delivery: 'Delivery driver collected the vehicle and set off', delivered: 'Delivered to the customer', cancelled: 'Booking cancelled',
-};
 function timeline(b) {
   const out = [];
-  (b.statusHistory || []).forEach((h) => out.push({ at: h.at, kind: 'booking', label: STATUS_LABEL[h.status] || X.NOTE[h.status] || h.status }));
+  (b.statusHistory || []).forEach((h) => out.push({ at: h.at, kind: 'booking', label: (h.status === 'in_transit' ? 'Vehicle on the way to your center' : h.status === 'received_at_center' ? 'Vehicle received at your center' : STAFF_STATUS_LABEL[h.status]) || h.status }));
   (b.jobLog || []).filter((l) => ['arrived', 'inspected', 'verified', 'center_arrived', 'handed_over'].includes(l.event)).forEach((l) => out.push({ at: l.at, kind: 'driver', label: ({ arrived: 'Driver arrived', inspected: 'Driver recorded vehicle condition', verified: 'Handover verified with OTP', center_arrived: 'Driver arrived at the service center', handed_over: 'Driver handed the vehicle to the center', started: 'Driver started a journey' })[l.event] }));
   if (b.receiving) out.push({ at: b.receiving.at, kind: 'center', label: `Receipt confirmed by ${b.receiving.byName}` });
   (b.workOrder?.history || []).forEach((h) => out.push({ at: h.at, kind: 'workorder', label: `Work order ${h.status.replace(/_/g, ' ')}${h.note ? `: ${h.note}` : ''}` }));
@@ -360,7 +355,9 @@ export const demoCenterAdapter = {
       const e = findOne(me, id);
       if (!['confirmed', 'driver_assigned'].includes(e.b.status)) throw new E('NOT_ALLOWED', 'This booking can no longer be changed because the pickup has started.');
       if (patch.date !== undefined && (patch.date !== e.b.pickup.date || patch.slot !== e.b.pickup.slot) && !slotOpen(patch.date, patch.slot)) throw new E('INVALID_INPUT', 'Choose a pickup date and a time slot that has not already passed.');
+      const moved = patch.date && (patch.date !== e.b.pickup.date || patch.slot !== e.b.pickup.slot);
       if (patch.date) { e.b.pickup.date = patch.date; e.b.pickup.slot = patch.slot; }
+      if (moved) X.tellDriverRescheduled(e.b, 'the service center');
       if (patch.landmark !== undefined) e.b.pickup.landmark = String(patch.landmark).trim();
       if (patch.instructions !== undefined) e.b.pickup.instructions = String(patch.instructions).trim();
       if (patch.priority && ['normal', 'urgent'].includes(patch.priority)) e.b.priority = patch.priority;
@@ -376,6 +373,7 @@ export const demoCenterAdapter = {
       const e = findOne(me, id);
       if (!['confirmed', 'driver_assigned'].includes(e.b.status)) throw new E('NOT_CANCELLABLE', 'This booking can no longer be cancelled because the pickup has already started.');
       X.setStatus(e.d, e.b, 'cancelled');
+      X.tellDriversCancelled(e.b, 'the service center');
       audit(e.b, me, 'booking.cancelled');
       write(e.key, e.d);
       return bookingDetail(me, cstate(me.centerId), e);

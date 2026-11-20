@@ -73,3 +73,11 @@ export const HANDOVER_COPY = {
     done: 'You received the vehicle from the delivery driver.',
   },
 };
+
+/** Wording for service-center staff and operations (the customer sees NOTE messages instead). */
+export const STAFF_STATUS_LABEL = {
+  confirmed: 'Booking created', driver_assigned: 'Driver assigned', driver_en_route: 'Driver on the way to the customer', picked_up: 'Vehicle picked up from the customer',
+  in_transit: 'Vehicle on the way to the service center', received_at_center: 'Vehicle received at the service center', service_in_progress: 'Service started', service_completed: 'Service completed',
+  delivery_driver_assigned: 'Delivery driver assigned', out_for_delivery: 'Delivery driver collected the vehicle and set off', delivered: 'Delivered to the customer', cancelled: 'Booking cancelled',
+};
+export const DRIVER_EVENT_LABEL = { offered: 'offered the job', accepted: 'accepted', declined: 'declined', started: 'set off', arrived: 'arrived', inspected: 'recorded the vehicle condition', verified: 'verified the handover with OTP', collected: 'confirmed collection', center_arrived: 'arrived at the service center', handed_over: 'handed the vehicle to the service center', completed: 'completed the job' };

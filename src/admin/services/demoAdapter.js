@@ -10,6 +10,7 @@
  */
 import { ServiceError as E } from '../../portal/services/errors';
 import { demoInternals as X } from '../../portal/services/demoAdapter';
+import { STAFF_STATUS_LABEL, DRIVER_EVENT_LABEL } from '../../portal/domain/status';
 
 const { NS, read, write, delay, rid, nowISO } = X;
 
@@ -60,6 +61,7 @@ const custId = (key) => (key.startsWith('data:u_') ? key.slice(5) : null);
 const centers = () => [...X.allCenters()].map((c) => { const st = plat().centers[c.id] || {}; return { ...c, approval: st.approval || 'approved', status: st.status || 'active', contact: st.contact, application: Boolean(plat().extraCenters.find((x) => x.id === c.id)) }; });
 const centerName = (id) => centers().find((c) => c.id === id)?.name || id;
 const dstate = (id) => read(`driver:${id}`, { availability: 'offline', notifications: [] });
+const fmtAgo = (iso) => { const m = Math.round(mins(iso)); return m < 60 ? `${m} min ago` : `${Math.round(m / 60)} h ago`; };
 const mins = (iso) => (iso ? (Date.now() - new Date(iso).getTime()) / 60000 : 0);
 const slotEnd = (date, slot) => { const m = String(slot || '').match(/-\s*(\d{1,2}):(\d{2})/); return new Date(`${date}T${m ? `${m[1].padStart(2, '0')}:${m[2]}` : '18:00'}:00`).getTime(); };
 
@@ -142,7 +144,7 @@ function driverView(u, es) {
 function activityOf(es) {
   const items = [];
   for (const { b } of es) {
-    (b.statusHistory || []).forEach((h, i) => items.push({ id: `${b.id}:s${i}`, at: h.at, bookingId: b.id, text: `${b.reference} · ${b.vehicle.registration}: ${X.NOTE[h.status] || h.status}` }));
+    (b.statusHistory || []).forEach((h, i) => items.push({ id: `${b.id}:s${i}`, at: h.at, bookingId: b.id, text: `${b.reference} · ${b.vehicle.registration}: ${STAFF_STATUS_LABEL[h.status] || h.status}` }));
     (b.workOrder?.history || []).forEach((h, i) => items.push({ id: `${b.id}:w${i}`, at: h.at, bookingId: b.id, text: `${b.reference}: work order ${h.status.replace(/_/g, ' ')}` }));
   }
   plat().audit.forEach((a) => items.push({ id: a.id, at: a.at, bookingId: a.entity === 'booking' ? a.entityId : null, text: `Admin ${a.adminName}: ${a.action.replace(/\./g, ' ')}` }));
@@ -383,8 +385,8 @@ export const demoAdminAdapter = {
       const e = findBooking(id); const P = plat(); const { b } = e; const s = summary(e, P.settings);
       const hv = (t) => X.handoverView(e.d, b, t); const j = b.pickupJob || {}; const dj = b.deliveryJob || {};
       const tl = [];
-      (b.statusHistory || []).forEach((h) => tl.push({ at: h.at, kind: 'booking', label: X.NOTE[h.status] || h.status }));
-      (b.jobLog || []).forEach((l) => tl.push({ at: l.at, kind: 'driver', label: `Driver: ${l.event.replace(/_/g, ' ')} (${l.job})` }));
+      (b.statusHistory || []).forEach((h) => tl.push({ at: h.at, kind: 'booking', label: STAFF_STATUS_LABEL[h.status] || h.status }));
+      (b.jobLog || []).forEach((l) => tl.push({ at: l.at, kind: 'driver', label: `${users().find((u) => u.id === l.by)?.name || 'Driver'} ${DRIVER_EVENT_LABEL[l.event] || l.event.replace(/_/g, ' ')} (${l.job})` }));
       if (b.receiving) tl.push({ at: b.receiving.at, kind: 'center', label: `Receipt confirmed by ${b.receiving.byName}` });
       (b.workOrder?.history || []).forEach((h) => tl.push({ at: h.at, kind: 'workorder', label: `Work order ${h.status.replace(/_/g, ' ')}` }));
       P.audit.filter((a) => a.entity === 'booking' && a.entityId === id).forEach((a) => tl.push({ at: a.at, kind: 'admin', label: `Admin ${a.adminName}: ${a.action.replace(/\./g, ' ')}${a.reason ? ` (${a.reason})` : ''}` }));
@@ -393,7 +395,14 @@ export const demoAdminAdapter = {
         driverFull: b.driver ? { id: b.driver.id, name: b.driver.name, phone: b.driver.phone } : null, deliveryDriverFull: b.deliveryDriver ? { id: b.deliveryDriver.id, name: b.deliveryDriver.name, phone: b.deliveryDriver.phone } : null,
         handovers: { pickup: { status: hv('pickup').status, verifiedAt: b.handovers.pickup.verifiedAt, attempts: e.d.otps?.[`${id}:pickup`]?.attempts || 0, driverCondition: j.inspection || null }, delivery: { status: hv('delivery').status, verifiedAt: b.handovers.delivery.verifiedAt, attempts: e.d.otps?.[`${id}:delivery`]?.attempts || 0, driverCondition: dj.inspection || null } },
         workOrder: b.workOrder ? { id: b.workOrder.id, reference: b.workOrder.reference, status: b.workOrder.status, startedAt: b.workOrder.startedAt, completedAt: b.workOrder.completedAt, technician: (read(`center:${b.centerId}`, { technicians: [] }).technicians || []).find((t) => t.id === b.workOrder.technicianId)?.name || null } : null,
-        receiving: b.receiving ? { at: b.receiving.at, byName: b.receiving.byName } : null, timeline: tl.sort((a, c) => (a.at < c.at ? 1 : -1)), adminNotes: (b.adminNotes || []).slice().reverse(),
+        receiving: b.receiving ? { at: b.receiving.at, byName: b.receiving.byName } : null,
+        handoverSteps: [
+          { key: 'pickup', title: 'Pickup from the customer', parties: 'Customer to driver', at: b.handovers.pickup.verifiedAt, method: 'Verified with the customer\'s OTP', by: b.driver?.name, condition: j.inspection || null, conditionLabel: 'Driver\'s vehicle check' },
+          { key: 'center_in', title: 'Handover at the service center', parties: 'Driver to center staff', at: b.receiving?.at || null, method: b.receiving ? `Receipt confirmed by ${b.receiving.byName}` : j.handedOverAt ? `Driver handed over ${fmtAgo(j.handedOverAt)}; the center has not confirmed receipt` : j.centerArrivedAt ? `Driver arrived ${fmtAgo(j.centerArrivedAt)}; the center has not confirmed receipt` : '', condition: b.receiving || null, conditionLabel: 'Center\'s receiving checklist' },
+          { key: 'center_out', title: 'Pickup from the service center', parties: 'Center staff to delivery driver', at: dj.startedAt || null, method: dj.startedAt ? 'Delivery driver collected the vehicle and set off' : '', by: b.deliveryDriver?.name },
+          { key: 'delivery', title: 'Delivery to the customer', parties: 'Driver to customer', at: b.handovers.delivery.verifiedAt, method: 'Verified with the customer\'s OTP', by: b.deliveryDriver?.name, condition: dj.inspection || null, conditionLabel: 'Driver\'s vehicle check' },
+        ],
+        dispatchJob: b.status === 'confirmed' && !b.driver ? `${b.id}~pickup` : b.status === 'service_completed' && b.delivery && !b.deliveryDriver ? `${b.id}~delivery` : null, timeline: tl.sort((a, c) => (a.at < c.at ? 1 : -1)), adminNotes: (b.adminNotes || []).slice().reverse(),
         permitted: { cancel: can(me, 'bookings.manage') && ['confirmed', 'driver_assigned', 'driver_en_route'].includes(b.status), update: can(me, 'bookings.manage') && ['confirmed', 'driver_assigned'].includes(b.status), assign: can(me, 'dispatch') },
       };
     },
@@ -403,7 +412,7 @@ export const demoAdminAdapter = {
       const e = findBooking(id);
       if (!['confirmed', 'driver_assigned', 'driver_en_route'].includes(e.b.status)) throw new E('NOT_CANCELLABLE', 'This booking cannot be cancelled because the vehicle has already been collected or the booking is finished.');
       const before = e.b.status;
-      X.setStatus(e.d, e.b, 'cancelled'); delete e.d.otps[`${id}:pickup`]; write(e.key, e.d);
+      X.setStatus(e.d, e.b, 'cancelled'); delete e.d.otps[`${id}:pickup`]; X.tellDriversCancelled(e.b, 'Speedy Fix operations'); write(e.key, e.d);
       audit(me, 'booking.cancelled', 'booking', id, { reason, before: { status: before }, after: { status: 'cancelled' } });
     },
     async update(id, patch, reason) {
@@ -413,7 +422,10 @@ export const demoAdminAdapter = {
       if (!['confirmed', 'driver_assigned'].includes(e.b.status)) throw new E('NOT_ALLOWED', 'This booking can no longer be corrected because the pickup has started.');
       if (patch.date !== undefined && (!patch.date || !X.SLOTS.includes(patch.slot))) throw new E('INVALID_INPUT', 'Choose a valid pickup date and time slot.');
       const before = { date: e.b.pickup.date, slot: e.b.pickup.slot, instructions: e.b.pickup.instructions, priority: e.b.priority || 'normal' };
+      const moved = patch.date && (patch.date !== e.b.pickup.date || patch.slot !== e.b.pickup.slot);
+      if (moved && patch.date < new Date().toISOString().slice(0, 10)) throw new E('INVALID_INPUT', 'Choose today or a later date.');
       if (patch.date) { e.b.pickup.date = patch.date; e.b.pickup.slot = patch.slot; }
+      if (moved) { X.tellDriverRescheduled(e.b, 'Speedy Fix operations'); X.addNote(e.d, e.b, 'rescheduled', `Operations moved your pickup to ${patch.date}, ${patch.slot}.`); }
       if (patch.instructions !== undefined) e.b.pickup.instructions = String(patch.instructions).trim();
       if (patch.priority && ['normal', 'urgent'].includes(patch.priority)) e.b.priority = patch.priority;
       e.b.updatedAt = nowISO(); write(e.key, e.d);
@@ -437,7 +449,7 @@ export const demoAdminAdapter = {
       for (const e of entries()) {
         const { b } = e; const s = summary(e, P.settings);
         const decl = (t) => (b.offers || []).filter((o) => o.job === t && o.status === 'declined').map((o) => ({ driver: users().find((u) => u.id === o.driverId)?.name || o.driverId, reason: o.reason || '', at: o.at }));
-        const mk = (type, state, assignee) => ({ jobId: `${b.id}~${type}`, type, booking: s, assignee, state, waitingMinutes: Math.round(mins(type === 'pickup' ? b.createdAt : b.delivery?.requestedAt || b.updatedAt)), pickupAddress: type === 'pickup' ? [b.pickup.address, b.pickup.city].filter(Boolean).join(', ') : b.center.address, destination: type === 'pickup' ? b.center.address : b.delivery?.address, declines: decl(type), offered: (b.offers || []).some((o) => o.job === type && X.offerLive(o)), reassignable: type === 'pickup' ? ['driver_assigned', 'driver_en_route'].includes(b.status) : ['delivery_driver_assigned', 'out_for_delivery'].includes(b.status) });
+        const mk = (type, state, assignee) => ({ jobId: `${b.id}~${type}`, type, booking: s, assignee, state, waitingMinutes: Math.round(mins(type === 'pickup' ? b.createdAt : b.delivery?.requestedAt || b.updatedAt)), pickupAddress: type === 'pickup' ? [b.pickup.address, b.pickup.city].filter(Boolean).join(', ') : b.center.address, destination: type === 'pickup' ? b.center.address : b.delivery?.address, declines: decl(type), offered: (b.offers || []).some((o) => o.job === type && X.offerLive(o)), liveOffers: (b.offers || []).filter((o) => o.job === type && X.offerLive(o)).length, reassignable: type === 'pickup' ? ['driver_assigned', 'driver_en_route'].includes(b.status) : ['delivery_driver_assigned', 'out_for_delivery'].includes(b.status) });
         if (b.status === 'confirmed' && !b.driver) items.push(mk('pickup', 'unassigned', null));
         else if (b.driver && b.status !== 'cancelled') items.push(mk('pickup', 'assigned', { id: b.driver.id, name: b.driver.name }));
         if (b.status === 'service_completed' && b.delivery && !b.deliveryDriver) items.push(mk('delivery', 'unassigned', null));
@@ -494,7 +506,26 @@ export const demoAdminAdapter = {
       b.offers = (b.offers || []).map((o) => (o.job === type && o.status === 'offered' ? { ...o, status: 'withdrawn' } : o));
       b.updatedAt = nowISO();
       write(e.key, e.d);
+      // Tell the drivers: the new one has a job; the replaced one no longer does.
+      const jid = `${bookingId}~${type}`;
+      X.notifyDriver(u.id, { jobId: jid, reference: b.reference, type: 'assigned', message: `Operations assigned you the ${type} for ${b.reference}${type === 'pickup' ? ` (${b.pickup.date}, ${b.pickup.slot})` : ''}.` });
+      if (cur) X.notifyDriver(cur.id, { jobId: jid, reference: b.reference, type: 'reassigned', message: `${b.reference}: operations moved this ${type} to another driver. You no longer need to do it.` });
       audit(me, cur ? 'assignment.reassigned' : 'assignment.assigned', 'booking', bookingId, { reason, before, after: { driver: u.name, job: type } });
+    },
+    /** Offers a waiting job again to every approved, online driver (for example when all earlier offers expired). */
+    async offerAll(jobId) {
+      await delay(350);
+      const me = ME(); need(me, 'dispatch');
+      const [bookingId, type] = String(jobId).split('~');
+      const e = findBooking(bookingId); const { b } = e;
+      const free = type === 'pickup' ? b.status === 'confirmed' && !b.driver : b.status === 'service_completed' && b.delivery && !b.deliveryDriver;
+      if (!free) throw new E('NOT_ALLOWED', 'This job is not waiting for a driver.');
+      const sent = X.dispatchOffers(b, type);
+      if (!sent) throw new E('NO_DRIVERS', (b.offers || []).some((o) => o.job === type && X.offerLive(o)) ? 'Every online driver already has an open offer for this job.' : 'No approved driver is online right now. Assign one directly instead.');
+      b.updatedAt = nowISO();
+      write(e.key, e.d);
+      audit(me, 'assignment.offered_all', 'booking', bookingId, { after: { job: type, drivers: sent } });
+      return { sent };
     },
     /** Sends an offer the driver can accept or decline (instead of a direct assignment). */
     async offer(jobId, driverId) {
@@ -509,6 +540,7 @@ export const demoAdminAdapter = {
       if ((b.offers || []).some((o) => o.job === type && o.driverId === driverId && X.offerLive(o))) throw new E('ALREADY_OFFERED', 'This driver already has an open offer for this job.');
       (b.offers = b.offers || []).push({ job: type, driverId, status: 'offered', at: nowISO(), by: me.id });
       write(e.key, e.d);
+      X.notifyDriver(driverId, { jobId: `${bookingId}~${type}`, reference: b.reference, type: 'offer', message: `New ${type} offer from operations: ${b.reference}. Answer within 5 minutes.` });
       audit(me, 'assignment.offered', 'booking', bookingId, { after: { driver: el.name, job: type } });
     },
   },

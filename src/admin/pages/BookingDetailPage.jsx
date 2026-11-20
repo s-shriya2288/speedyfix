@@ -6,6 +6,7 @@ import { Badge, Button, Card, CardHeader, ErrorState, InlineAlert, Modal, Select
 import { fmtDate, fmtDateTime, todayISO } from '../../portal/lib/format';
 import { notifyChanged } from '../../portal/lib/events';
 import { FlagBadges, ReasonDialog, StatusBadge } from '../features/common';
+import HandoverRecords from '../../center/features/HandoverRecords';
 
 const SLOTS = ['09:00 - 12:00', '12:00 - 15:00', '15:00 - 18:00'];
 const Row = ({ k, children }) => <div className="grid gap-0.5 py-2.5 sm:grid-cols-[9rem_1fr] sm:gap-4"><dt className="text-sm text-slate-400">{k}</dt><dd className="text-sm text-slate-100">{children || <span className="text-slate-400">Not provided</span>}</dd></div>;
@@ -33,6 +34,7 @@ export default function BookingDetailPage() {
         <h2 className="mt-3 font-display text-2xl text-white">{b.reference}</h2>
         <p className="text-slate-300">{b.vehicle.registration} · {b.vehicle.make} {b.vehicle.model} · {b.customer.name} · {b.center.name}</p>
         <div className="mt-4 flex flex-wrap gap-2">
+          {b.permitted.assign && b.dispatchJob && <Button size="sm" variant="secondary" onClick={() => after(() => adminServices.dispatch.offerAll(b.dispatchJob), 'Offered to online drivers')}>Offer to all online drivers</Button>}
           {b.permitted.assign && ['pending_assignment', 'driver_assigned', 'pickup_in_progress', 'ready_for_delivery', 'delivery_in_progress'].includes(b.statusKey) && <Button as={Link} to="/admin/assignments" size="sm">Open dispatch</Button>}
           {b.permitted.update && <Button variant="secondary" size="sm" onClick={() => { setF({ date: b.pickup.date, slot: b.pickup.slot, instructions: b.pickup.instructions || '', priority: b.priority, reason: '' }); setEdit(true); }}>Correct booking</Button>}
           {b.permitted.cancel && <Button variant="danger" size="sm" onClick={() => setCancel(true)}>Cancel booking</Button>}
@@ -46,11 +48,7 @@ export default function BookingDetailPage() {
             <Row k="Pickup">{fmtDate(b.pickup.date)}, {b.pickup.slot}</Row><Row k="Pickup address">{[b.pickup.address, b.pickup.city, b.pickup.postalCode].filter(Boolean).join(', ')}{b.pickup.landmark ? ` (${b.pickup.landmark})` : ''}</Row>
             <Row k="Pickup driver">{b.driverFull ? `${b.driverFull.name}${b.driverFull.phone ? ` · ${b.driverFull.phone}` : ''}` : null}</Row><Row k="Delivery">{b.delivery ? `${fmtDate(b.delivery.date)}, ${b.delivery.slot} · ${b.delivery.address}` : null}</Row><Row k="Delivery driver">{b.deliveryDriverFull?.name}</Row>
             <Row k="Instructions">{[b.notesText, b.pickup.instructions].filter(Boolean).join(' / ')}</Row></dl></Card>
-          <Card><CardHeader title="Handover records" /><div className="divide-y divide-white/10">{['pickup', 'delivery'].map((t) => { const h = b.handovers[t]; const [tone, label] = HV[h.status] || HV.waiting; return (
-            <div key={t} className="px-5 py-4 text-sm"><div className="flex items-center justify-between gap-3"><span className="text-white">{t === 'pickup' ? 'Pickup (customer to driver)' : 'Delivery (driver to customer)'}</span><Badge tone={tone}>{label}</Badge></div>
-              {h.verifiedAt && <p className="mt-1 text-xs text-slate-400">Verified {fmtDateTime(h.verifiedAt)}</p>}{h.attempts > 0 && !h.verifiedAt && <p className="mt-1 text-xs text-amber-200">{h.attempts} failed {h.attempts === 1 ? 'attempt' : 'attempts'}</p>}
-              {h.driverCondition && <p className="mt-1 text-xs text-slate-400">Driver condition record: exterior {h.driverCondition.exterior}, scratches {h.driverCondition.scratches}.</p>}</div>); })}
-            <p className="px-5 py-3 text-xs text-slate-400">Codes are never shown here. Handovers can only be verified by the driver's server-side check; admins cannot verify or override them. <Link to="/admin/handovers" className="text-volt-glow hover:underline">Handover monitoring</Link></p></div></Card>
+          <HandoverRecords steps={b.handoverSteps} footer={<>Codes are never shown to operations. Customer handovers can only be verified by the driver's server-side check.{['pickup', 'delivery'].map((t) => { const h = b.handovers[t]; return h.attempts > 0 && !h.verifiedAt ? <span key={t} className="block text-amber-200">{t === 'pickup' ? 'Pickup' : 'Delivery'} code: {h.attempts} failed {h.attempts === 1 ? 'attempt' : 'attempts'} ({(HV[h.status] || HV.waiting)[1]}).</span> : null; })} <Link to="/admin/handovers" className="text-volt-glow hover:underline">Handover monitoring</Link></>} />
           {b.workOrder && <Card><CardHeader title="Work order" action={<Badge>{b.workOrder.status.replace(/_/g, ' ')}</Badge>} /><dl className="divide-y divide-white/10 px-5"><Row k="Reference">{b.workOrder.reference}</Row><Row k="Technician">{b.workOrder.technician}</Row><Row k="Started">{b.workOrder.startedAt ? fmtDateTime(b.workOrder.startedAt) : null}</Row><Row k="Completed">{b.workOrder.completedAt ? fmtDateTime(b.workOrder.completedAt) : null}</Row><Row k="Received">{b.receiving ? `${fmtDateTime(b.receiving.at)} by ${b.receiving.byName}` : null}</Row></dl><p className="border-t border-white/10 px-5 py-3 text-xs text-slate-400">Read-only here. Workshop records are edited by the service center.</p></Card>}
         </div>
         <div className="space-y-6">

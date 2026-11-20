@@ -21,13 +21,16 @@ without the admin role see an access-denied page.
 | drivers | list, setApproval(id, approved/rejected/suspended, reason) |
 | centers | list, get, setApproval, setStatus(active/suspended, reason), updateInfo(contact, hours, reason) |
 | bookings | list, get, cancel(id, reason), update(id, patch, reason), addNote |
-| dispatch | list({view}), eligibleDrivers(jobId), assign(jobId, driverId, {reason, expectedDriverId}), offer(jobId, driverId) |
+| dispatch | list({view}), eligibleDrivers(jobId), assign(jobId, driverId, {reason, expectedDriverId}), offer(jobId, driverId), offerAll(jobId) |
 | vehicles, workOrders | list (read-only) |
 | handovers | list, reissue(jobId, reason) |
 | alerts | list, acknowledge, count |
 | reports | get({from,to}), exportBookings({from,to}) |
 | audit | list (there is deliberately no update or delete) |
 | settings | get, update(next, reason) |
+
+Drivers are notified of every assignment, offer, reassignment (both drivers), pickup-time change and cancellation, from any portal.
+`bookings.get` returns `handoverSteps` (the four handovers) and `dispatchJob` (the job waiting for a driver, if any).
 
 ## What the backend must enforce (the UI only hints)
 1. Identity and administrator level come from the verified session. A role can only be set by an existing super admin or a service process,
